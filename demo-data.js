@@ -4,7 +4,8 @@ const flood = "🌊 flood";
 
 
 function ago(targetMinutes, rangeMinutes = 1) { // Return a random time approximately targetMintues ago
-  return Math.round(Date.now() - targetMinutes * 60e3 + rangeMinutes/2 * 60e3 - Math.random() * rangeMinutes/2 * 60e3);
+  const ago = targetMinutes * 60e3 + rangeMinutes/2 * 60e3 - Math.random() * rangeMinutes/2 * 60e3;
+  return Math.round(Date.now() - Math.max(0, ago)); // Do not go into the future.
 }
 
 export const demoData = [
@@ -24,9 +25,8 @@ export const demoData = [
   {lat: 37.48385749967984, lng: -122.24383234977724, eventTime: ago(4), tag: ice},
   {lat: 37.48221435725274, lng: -122.2467076778412, eventTime: ago(3), tag: ice},
   {lat: 37.480426441022495, lng: -122.24890708923341, eventTime: ago(2), tag: ice, replies: "They aren't stopping!"},
-  {lat: 37.47909824698557, lng: -122.24994778633119, eventTime: ago(0), tag: ice, replies: "This is what I'm seeing"}
-  // {lat: 37.47909824698557, lng: -122.24994778633119, eventTime: ago(0), tag: ice, replies: [
-  //   {message: "This is what I'm seeing", filename: "ice-image.png", user: 'user2'},
-  //   {message: "omg!", user: 'user3'}
-  // ]}
+  {lat: 37.47909824698557, lng: -122.24994778633119, eventTime: ago(1), tag: ice, replies: [
+    {message: "This is what I'm seeing", user: 'user2', filename: "ice-image.png"},
+    {message: "omg!", user: 'user3'}
+  ]}
 ];

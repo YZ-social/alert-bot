@@ -76,10 +76,10 @@ async function publishEvent({lat, lng, // location on the globe
       const {message, user = source, filename} = reply;
       payload = {message};
       replySource = user;
-      // if (filename) { // Large messages are not working in DHT yet.
-      // 	payload.file = imageToUri(`./images/${filename}`);
-      // 	payload.name = filename;
-      // }
+      if (filename) {
+	payload.file = imageToUri(`./images/${filename}`);
+	payload.name = filename;
+      }
     }
     await contact.publish({eventName: alertIdentifier, subject: replyIdentifier, payload, act: replySource});
   }
