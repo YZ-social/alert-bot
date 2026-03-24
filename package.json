@@ -1,0 +1,30 @@
+{
+  "name": "alert-bot",
+  "version": "0.0.1",
+  "description": "Adds data to the DHT.",
+  "scripts": {
+    "local": "node ./index.js --externalBaseURL http://localhost:3000/kdht",
+    "shared": "node ./index.js --externalBaseURL https://ki1r0y.com/kdht"
+  },
+  "exports": {
+    ".": "./index.js"
+  },
+  "type": "module",
+  "keywords": [
+    "DHT",
+    "pub/sub",
+    "data",
+    "alert",
+    "post"
+  ],
+  "author": "howard.stearns@gmail.com",
+  "license": "MIT",
+  "dependencies": {
+    "@yz-social/kdht": "^0.1.28",
+    "image-to-uri": "^1.0.0",
+    "s2js": "^1.44.0",
+    "uuid": "^13.0.0",
+    "why-is-node-running": "^3.2.2",
+    "yargs": "^18.0.0"
+  }
+}
