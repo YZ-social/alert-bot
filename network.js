@@ -10,7 +10,7 @@ import process from 'node:process';
    The alternate allows us distinguish between bugs in the app vs bugs on the DHT.
 
    This alternative can be reached via the civildefense.io app by using a ?dht=0 query parameter.
-   To have the bot use this, specify dht 0 in the command line.
+   To have the bot use this, specify --dht 0 in the command line (e.g., node ./index.js --dht 0).
  */
 
 let NetworkClass;
@@ -19,7 +19,7 @@ const dhtIndex = process.argv.indexOf('--dht');
 const externalBaseURLIndex = process.argv.indexOf('--externalBaseURL');
 const verboseIndex = process.argv.indexOf('--verbose');
 const dht = dhtIndex > 0 ? parseInt(process.argv[dhtIndex + 1]) : 1;
-const externalBaseURL = externalBaseURLIndex > 0 ? process.argv[externalBaseURL + 1] : 'http://localhost:300/kdht';
+const externalBaseURL = externalBaseURLIndex > 0 ? process.argv[externalBaseURLIndex + 1] : 'http://localhost:3000/kdht';
 const info = true;
 const verbose = verboseIndex > 0 ? JSON.parse(process.argv[verboseIndex + 1]) : false;
 

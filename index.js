@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-//import whyIsNodeRunning from 'why-is-node-running' // should be your first import
 import process from 'node:process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -94,4 +93,3 @@ if (info) console.log('published');
 await new Promise(resolve => setTimeout(resolve, 5e3));
 await contact.disconnect(true);
 if (info) console.log('done! winding down');
-//setImmediate(() => whyIsNodeRunning())

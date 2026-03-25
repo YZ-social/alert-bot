@@ -21,11 +21,11 @@ export const demoData = [
   {lat: 37.467603274015495, lng: -122.26244688034059, eventtime: ago(1), tag: flood},
 
   // Ice
-  {lat: 37.484768449081784, lng: -122.2436285018921, eventTime: ago(5), tag: ice},
-  {lat: 37.48385749967984, lng: -122.24383234977724, eventTime: ago(4), tag: ice},
-  {lat: 37.48221435725274, lng: -122.2467076778412, eventTime: ago(3), tag: ice},
-  {lat: 37.480426441022495, lng: -122.24890708923341, eventTime: ago(2), tag: ice, replies: "They aren't stopping!"},
-  {lat: 37.47909824698557, lng: -122.24994778633119, eventTime: ago(1), tag: ice, replies: [
+  {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(5), tag: ice},
+  {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(4), tag: ice},
+  {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(3), tag: ice},
+  {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(2), tag: ice, replies: "They aren't stopping!"},
+  {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(1), tag: ice, replies: [
     {message: "This is what I'm seeing", user: 'user2', filename: "ice-image.png"},
     {message: "omg!", user: 'user3'}
   ]}

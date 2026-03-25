@@ -20,11 +20,10 @@
   "author": "howard.stearns@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "@yz-social/kdht": "^0.1.28",
+    "@yz-social/kdht": "^0.1.30",
     "image-to-uri": "^1.0.0",
     "s2js": "^1.44.0",
     "uuid": "^13.0.0",
-    "why-is-node-running": "^3.2.2",
     "yargs": "^18.0.0"
   }
 }
