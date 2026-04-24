@@ -4,7 +4,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { v4 as uuidv4 } from 'uuid';
 import { getContainingCells } from './s2.js';
-import { demoData } from './demo-data.js';
+import { demoData, users } from './demo-data.js';
 import { NetworkClass } from './network.js'; // Temporary hack. See file.
 const imageToUri = (await import('image-to-uri')).default;
 
@@ -45,6 +45,13 @@ if (info) console.log({externalBaseURL, network: NetworkClass.name});
 const contact = await NetworkClass.create({info, debug: verbose});
 await contact.connect(externalBaseURL);
 
+// Publish the handle/avatar for each reporting user.
+for (const {tag, handle, avatar} of Object.values(users)) {
+  if (handle) await contact.publish({ eventName: `public:${tag}`, subject: 'handle', payload: handle });
+  if (avatar) await contact.publish({ eventName: `public:${tag}`, subject: 'avatar', payload: imageToUri(`./images/${avatar}`) });  
+}
+
+
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL used by the contact).
 async function publishEvent({lat, lng, // location on the globe
 			     eventTime, // Javscript timestamp
@@ -52,9 +59,10 @@ async function publishEvent({lat, lng, // location on the globe
 			     // (Later this will involve signing by a public key. https://github.com/kilroy-code/distributed-security
 			     replies = [], // Additional information, if any.
 			     topicWithDefaultIcon, // Hashtag with a leading emoji used as an icon on the map.
-			     topicKey = topicWithDefaultIcon.replace(/^\p{Extended_Pictographic}*\uFE0F?\s*/u, '') // Stripping off any leading emoji.
+			     topicKey = topicWithDefaultIcon.replace(/^\p{Emoji}*\uFE0F?\s*/u, '') // Stripping off any leading emoji.
 			    }) {
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
+  const sourceTag = users[source].tag;
 
   // First we publish the "alert" - which will appear as an icon on the map.  
   // If the user opens it, it has a timestamp and an identicon for the source string.
@@ -62,19 +70,19 @@ async function publishEvent({lat, lng, // location on the globe
   const cells = getContainingCells(lat, lng);
   const alertIdentifier = uuidv4(); // A unique identifier for this alert, which people will reply to.
   const payload = {lat, lng};
-  console.log(source, lat, lng, topicWithDefaultIcon);
+  //console.log(source, lat, lng, topicWithDefaultIcon);
   for (const cell of cells) {
     const eventName = `s2:${cell}:${topicKey}`;
-    await contact.publish({eventName, subject: alertIdentifier, payload, hashtag: topicWithDefaultIcon, act: source, issuedTime: eventTime});
+    await contact.publish({eventName, subject: alertIdentifier, payload, hashtag: topicWithDefaultIcon, act: sourceTag, issuedTime: eventTime});
   }
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
-    console.log('reply', reply);
+    //console.log('reply', reply);
     const replyIdentifier = uuidv4(); // A unique identifier for this reply.
-    let payload = reply, replySource = source;
-    if (reply.user) { // Each reply can be a string or an object with message and optional user and filename.
+    let payload = reply, replySource = sourceTag;
+    if (reply.message) { // Each reply can be a string or an object with message and optional user and filename.
       const {message, user = source, filename} = reply;
       payload = {message};
-      replySource = user;
+      replySource = users[user].tag;
       if (filename) {
 	payload.file = imageToUri(`./images/${filename}`);
 	payload.name = filename;
@@ -82,11 +90,20 @@ async function publishEvent({lat, lng, // location on the globe
     }
     await contact.publish({eventName: alertIdentifier, subject: replyIdentifier, payload, act: replySource});
   }
+  return alertIdentifier;
 }
 
+const url = new URL('/', externalBaseURL)
+const params = url.searchParams
+  
 // Post each datum in demoData.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
-  await publishEvent({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
+  const subject = await publishEvent({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
+  params.set('lat', lat);
+  params.set('lng', lng);
+  params.set('sub', subject);
+  params.set('tags', encodeURIComponent(tag));
+  console.log(url.href);
 }
 
 if (info) console.log('published');
