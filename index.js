@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getContainingCells } from './s2.js';
 import { demoData, users } from './demo-data.js';
 import { NetworkClass } from './network.js'; // Temporary hack. See file.
+import { fetchStations, defaultRegions } from './station-data.js';
 const imageToUri = (await import('image-to-uri')).default;
 
 process.title = 'alert-bot'; // Handy for debugging when you have lots of nodejs processes.
@@ -35,9 +36,29 @@ const argv = yargs(hideBin(process.argv))
 	default: 1,
 	description: "Temporary hack option to use the alternative pub/sub if the value is 0."
       })
+      .option('radio-stations', {
+	type: 'boolean',
+	default: false,
+	description: "Enable radio station mode instead of demo data."
+      })
+      .option('station-styles', {
+	type: 'string',
+	default: 'news,jazz,classic rock',
+	description: "Comma-separated list of station styles to fetch."
+      })
+      .option('station-count', {
+	type: 'number',
+	default: 5,
+	description: "Number of stations to fetch per style per region."
+      })
+      .option('station-region', {
+	type: 'string',
+	default: 'north-america',
+	description: "Region key from defaultRegions (north-america, europe, or asia)."
+      })
       .parse();
 
-const {externalBaseURL, info, verbose} = argv; // yargs puts values in argv.
+const {externalBaseURL, info, verbose, radioStations, stationStyles, stationCount, stationRegion} = argv; // yargs puts values in argv.
 if (info) console.log({externalBaseURL, network: NetworkClass.name});
 
 // Create a p2p node and connect to the YZ network through externalBaseURL.
@@ -96,8 +117,29 @@ async function publishEvent({lat, lng, // location on the globe
 const url = new URL('/', externalBaseURL)
 const params = url.searchParams
   
-// Post each datum in demoData.
-for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
+let dataToPublish;
+
+if (radioStations) {
+  // Parse station options
+  const styles = stationStyles.split(',').map(s => s.trim());
+  const regionKey = stationRegion.toLowerCase();
+  const regionConfig = defaultRegions[regionKey];
+  
+  if (!regionConfig) {
+    console.error(`Unknown region: ${regionKey}. Available: ${Object.keys(defaultRegions).join(', ')}`);
+    process.exit(1);
+  }
+  
+  // Fetch radio stations
+  if (info) console.log(`Fetching ${stationCount} stations per style for ${styles.join(', ')} in ${regionConfig.label}...`);
+  dataToPublish = await fetchStations(styles, regionConfig.regions, stationCount);
+  if (info) console.log(`Fetched ${dataToPublish.length} stations total.`);
+} else {
+  dataToPublish = demoData;
+}
+
+// Post each datum.
+for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of dataToPublish) {
   const subject = await publishEvent({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
   params.set('lat', lat);
   params.set('lng', lng);
