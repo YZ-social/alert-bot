@@ -3,9 +3,9 @@
   "version": "0.0.3",
   "description": "Adds data to the DHT.",
   "scripts": {
-    "local": "node ./index.js --externalBaseURL http://localhost:3000/kdht",
-    "ki1r0y": "node ./index.js --externalBaseURL https://ki1r0y.com/kdht",
-    "civildefense": "node ./index.js --externalBaseURL https://civildefense.io/kdht"
+    "local": "node ./index.js --externalBaseURL http://localhost:3000/kdht/",
+    "ki1r0y": "node ./index.js --externalBaseURL https://ki1r0y.com/kdht/",
+    "civildefense": "node ./index.js --externalBaseURL https://civildefense.io/kdht/"
   },
   "exports": {
     ".": "./index.js"

@@ -29,17 +29,17 @@ export const users = {
 export const demoData = [
 
   // Movie setup.
-  {lat: 37.7822948, lng: -122.4135586, tag: hospital}, // Golden Gate, two east of Leavenworth.
-  {lat: 37.7859424, lng: -122.4237171, tag: hospital}, // Geary@VanNess x Franklin@Post
-  {lat: 37.7908801, lng: -122.4201728, tag: hospital}, // Hyde, Bush, Pine
-  {lat: 37.7787880226612, lng: -122.41752147674562, tag: rally}, // civic center, Grove
-  {lat: 37.778974579730495, lng: -122.41450130939485, tag: rally}, // Market@8
-  {lat: 37.781060594893326, lng: -122.41181373596193, tag: rally}, // Market@Jones
-  {lat: 37.78321438617593, lng: -122.40904569625856, tag: rally}, // Market@5
-  {lat: 37.785703039281096, lng: -122.40603357553485, tag: rally}, // Market@Stockton
-  {lat: 37.78823400256615, lng: -122.40716814994813, tag: rally}, // Union Square  
-  {lat: 37.779415530931715, lng: -122.4158960580826, tag: restroom}, // Fulton Plaza/
-  {lat: 37.787553576232526, lng: -122.40743368864061, tag: restroom}, // Union Square
+  // {lat: 37.7822948, lng: -122.4135586, tag: hospital}, // Golden Gate, two east of Leavenworth.
+  // {lat: 37.7859424, lng: -122.4237171, tag: hospital}, // Geary@VanNess x Franklin@Post
+  // {lat: 37.7908801, lng: -122.4201728, tag: hospital}, // Hyde, Bush, Pine
+  // {lat: 37.7787880226612, lng: -122.41752147674562, tag: rally}, // civic center, Grove
+  // {lat: 37.778974579730495, lng: -122.41450130939485, tag: rally}, // Market@8
+  // {lat: 37.781060594893326, lng: -122.41181373596193, tag: rally}, // Market@Jones
+  // {lat: 37.78321438617593, lng: -122.40904569625856, tag: rally}, // Market@5
+  // {lat: 37.785703039281096, lng: -122.40603357553485, tag: rally}, // Market@Stockton
+  // {lat: 37.78823400256615, lng: -122.40716814994813, tag: rally}, // Union Square
+  // {lat: 37.779415530931715, lng: -122.4158960580826, tag: restroom}, // Fulton Plaza/
+  // {lat: 37.787553576232526, lng: -122.40743368864061, tag: restroom}, // Union Square
 
   // Fire
   {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fire},

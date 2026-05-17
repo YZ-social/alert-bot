@@ -15,7 +15,7 @@ const argv = yargs(hideBin(process.argv))
       .usage(`Publish CivilDefense.io alerts.`)
       .option('externalBaseURL', {
 	type: 'string',
-	default: 'http://localhost:3000/kdht',
+	default: 'http://localhost:3000/kdht/',
 	description: "The base URL of the some other portal server to which we should connect ours, if any."
       })
       .option('info', {
@@ -39,6 +39,7 @@ const argv = yargs(hideBin(process.argv))
 
 const {externalBaseURL, info, verbose} = argv; // yargs puts values in argv.
 if (info) console.log({externalBaseURL, network: NetworkClass.name});
+await NetworkClass.configure(externalBaseURL);
 
 // Create a p2p node and connect to the YZ network through externalBaseURL.
 // For more information, see https://github.com/YZ-social/kdht?tab=readme-ov-file#kdht, which is the p2p network used by Civil Defense.
