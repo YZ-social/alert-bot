@@ -89,12 +89,14 @@ export async function fetchStations(styles = ['news'], regionsLatLng = [], count
         const stationLng = parseFloat(station.geo_long);
         if (stationLat && stationLng) {
           collectedStations.push({ station, tag });
+	  //console.log({tag, station});
         }
       }
     } catch (error) {
       console.error(`Error fetching stations for style "${style}":`, error.message);
     }
   }
+  console.log('Collected', collectedStations.length, 'stations');
   
   // Now assign to regions
   let stationIndex = 0;
@@ -115,6 +117,7 @@ export async function fetchStations(styles = ['news'], regionsLatLng = [], count
       
       // Use actual geo if in bbox, else region center
       let lat = stationLat, lng = stationLng;
+
       if (!(stationLat >= minLat && stationLat <= maxLat &&
             stationLng >= minLng && stationLng <= maxLng)) {
         lat = (minLat + maxLat) / 2;
