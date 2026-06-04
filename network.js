@@ -1,9 +1,10 @@
-import { AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, deriveIdentity, dumpIdentity, loadIdentity, deriveTopicId, geoCellId, geoCellCenter } from '@axona/protocol';
+import { AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, deriveIdentity, dumpIdentity, loadIdentity, deriveTopicId, geoCellId, geoCellCenter, } from '@axona/protocol';
 // What is the right way to use webTransport? It doesn't seem to define a usable export nor define the necessary dependencies.
 // So here we guess:
 import wrtc from '@roamhq/wrtc';
 globalThis.RTCPeerConnection = wrtc.RTCPeerConnection;
 import { webTransport } from './node_modules/@axona/protocol/src/transport/web/index.js';
+import { clientTransport } from './node_modules/@axona/protocol/src/transport/node/index.js';
 
 const { BigInt } = globalThis;
 //const { URL, WebSocket } = globalThis; // For linters.
@@ -30,39 +31,45 @@ export class NetworkClass {
     this.region = geoCellCenter(geoCellId(lat, lng));
   }
   static async delay(ms, label = '', result) {
-    console.log('delay', label, ms);
-    await new Promise(resolve => setTimeout(resolve, ms, result));
-    console.log('delayed');
-    return result;
+    //console.log('delay', label, ms);
+    return await new Promise(resolve => setTimeout(resolve, ms, result));
+    // console.log('delayed');
+    // return result;
   }
   static async create({info, debug, region = this.region} = {}) {
     const contact = new this();
-    await this.delay(1e3, 'start');
+    //await this.delay(1e3, 'start');
     // There is one peer doing all the alert-bot publishing, and we reuse the same identify for it on each run.
     // This is not the same as the application-level actor.
     const identity = await loadIdentity({"id":"80459655d660a503e6e8c66a8107091e368c3bdf1eb6f1a9ab298eb626ffe21814","pubkey":"01b76928b634daa48b145299da9868df8fa28da02b1a9ef1991099839827e014","privkey":"MC4CAQAwBQYDK2VwBCIEIJFDLeJS9AWSRYwJaiSCn+yX8VUnTtqwv/Zmfl+MtNiO","region":{"lat":34.64422054710852,"lng":-124.50852298766841},"createdAt":1780441759240});
     //const identity = await deriveIdentity(region);
     console.log(JSON.stringify(await dumpIdentity(identity)));
-    await this.delay(1e3, 'creating transport');
+    //await this.delay(1e3, 'creating transport');
+
+    // I'd rather use webTransport, below, to exercise wrtc. But that doesn't seem to work.
+    // For now, we'll construct a socket directly to the bridge and use a socket transport rather than a composite socket/web.
     const transport = webTransport({ bridgeUrl: 'wss://bridge.axona.net', identity});
-    await this.delay(1e3, 'starting transport');
+    //await this.delay(1e3, 'starting transport');
+
     await transport.start(identity.id);
+    //await this.delay(1e3, 'started transport');
+
     const node     = new NeuronNode({
       id:  BigInt('0x' + identity.id),
       lat: region.lat, lng: region.lng,
     });
     node.transport = transport;
     const domain   = new AxonaDomain({ k: 20 });
-    await this.delay(1e3, 'creating peer');
+    //await this.delay(1e3, 'creating peer');
     contact.peer = new AxonaPeer({ domain, node, identity, transport });
-    await this.delay(1e3, 'created peer');
+    //await this.delay(1e3, 'created peer');
     return contact;
   }
   async connect({} = {}) {
     await this.peer.join();
-    console.log('joined', this.peer.health());
-    await this.constructor.delay(1e3, 'after join');
-    console.log('after pause', this.peer.health());
+    console.log('joined', this.peer.health().synaptomeSize);
+    // await this.constructor.delay(1e3, 'after join');
+    // console.log('after pause', this.peer.health().synaptomeSize);
     const READY_SYNAPSE_COUNT = 4;
     const READY_TIMEOUT_MS    = 10_000;
     const waitForMeshReady = async () => {
@@ -77,19 +84,21 @@ export class NetworkClass {
       return this.peer._node.synaptome.size;
     };
     await waitForMeshReady();
-    console.log('waited', this.peer.health());
+    console.log('waited', this.peer.health().synaptomeSize);
   }
   async disconnect() { // Close network connection, if any.
-    console.log('leaving', this.peer.health());
+    //await this.constructor.delay(20e3, 'pause after publish');
+    const health = this.peer.health();
+    console.log('leaving', health.peers, health.axonRoles.map(role => role.topic));
     await this.peer.leave();
     //console.log('stopping', this.peer.health());
     await this.peer.stop();
     //console.log('stopped', this.peer.health());
   }
-  async publish({eventName, subject, payload, hashtag, act, issuedTime,
+  async publish({eventName, subject, payload, hashtag, act, issuedTime = Date.now(),
 		 publisher = null
 		}) {
-    const message = {subject, payload};
+    const message = {subject, issuedTime, payload};
     if (hashtag) message.hashtag = hashtag;
     if (act) message.act = act;
     //console.log('pub', message);

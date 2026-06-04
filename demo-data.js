@@ -42,28 +42,28 @@ export const demoData = [
   // {lat: 37.787553576232526, lng: -122.40743368864061, tag: restroom}, // Union Square
 
   // Fire
-  // {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fire},
-  // {lat: 37.464503586118525, lng: -122.2788190841675, eventTime: ago(800), tag: fire},
-  // {lat: 37.46777358281261, lng: -122.27748870849611, eventTime: ago(600), tag: fire},
-  // {lat: 37.471626715651524, lng: -122.271526157856, eventTime: ago(400), tag: fire},
+  {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fire},
+  {lat: 37.464503586118525, lng: -122.2788190841675, eventTime: ago(800), tag: fire},
+  {lat: 37.46777358281261, lng: -122.27748870849611, eventTime: ago(600), tag: fire},
+  {lat: 37.471626715651524, lng: -122.271526157856, eventTime: ago(400), tag: fire},
   {lat: 37.472563358818114, lng: -122.26354122161867, eventTime: ago(200), tag: fire, replies: 'Here we go'},
-  // {lat: 37.47179275779608, lng: -122.26040840148927, eventTime: ago(1), tag: fire, replies: [
-  //   {message: 'Getting closer!', user: 'user2'},
-  //   {message: 'stay safe', user: 'user3'}
-  // ]},
+  {lat: 37.47179275779608, lng: -122.26040840148927, eventTime: ago(1), tag: fire, replies: [
+    {message: 'Getting closer!', user: 'user2'},
+    {message: 'stay safe', user: 'user3'}
+  ]},
 
   // Flood
-  //{lat: 37.467603274015495, lng: -122.26244688034059, eventtime: ago(1), tag: flood},
+  {lat: 37.467603274015495, lng: -122.26244688034059, eventtime: ago(1), tag: flood},
 
   // Ice
-  // {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: ice},
-  // {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(800), tag: ice},
-  // {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: ice},
-  // {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: ice/*, replies: "They aren't stopping!"*/},
-  // {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(1), tag: ice, replies: [
-  //   // {message: "This is what I'm seeing", user: 'user2',
-  //   //  //filename: "ice-image.png"
-  //   // },
-  //   // {message: "omg!", user: 'user3'}
-  // ]}
+  {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: ice},
+  {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(800), tag: ice},
+  {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: ice},
+  {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: ice/*, replies: "They aren't stopping!"*/},
+  {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(1), tag: ice, replies: [
+    {message: "This is what I'm seeing", user: 'user2',
+     //filename: "ice-image.png"
+    },
+    {message: "omg!", user: 'user3'}
+  ]}
 ];

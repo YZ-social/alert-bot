@@ -68,7 +68,7 @@ await NetworkClass.configure({/*externalBaseURL*/});
 const contact = await NetworkClass.create({info, debug: verbose});
 await contact.connect({/*externalBaseURL*/});
 
-const networkVersion = 8;
+const networkVersion = 12;
 function publicEventName(tag) {
   return `public:${networkVersion}:${tag}`
 }
@@ -77,11 +77,11 @@ function alertEventName(cellTag, topicKey) {
 }
 
 // Publish the handle/avatar for each reporting user.
-// for (const {tag, handle, avatar} of Object.values(users)) {
-//   const eventName = publicEventName(tag);
-//   if (handle) await contact.publish({ eventName, subject: 'handle', payload: handle });
-//   if (avatar) await contact.publish({ eventName, subject: 'avatar', payload: imageToUri(`./images/${avatar}`) });
-// }
+for (const {tag, handle, avatar} of Object.values(users)) {
+  const eventName = publicEventName(tag);
+  if (handle) await contact.publish({ eventName, subject: 'handle', payload: handle });
+  if (avatar) await contact.publish({ eventName, subject: 'avatar', payload: imageToUri(`./images/${avatar}`) });
+}
 
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL used by the contact).
