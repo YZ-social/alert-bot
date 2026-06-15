@@ -4,7 +4,7 @@ import { AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, deriveIdentity, dumpI
 import wrtc from '@roamhq/wrtc';
 globalThis.RTCPeerConnection = wrtc.RTCPeerConnection;
 import { webTransport } from './node_modules/@axona/protocol/src/transport/web/index.js';
-import { clientTransport } from './node_modules/@axona/protocol/src/transport/node/index.js';
+//import { clientTransport } from './node_modules/@axona/protocol/src/transport/node/index.js';
 
 const { BigInt } = globalThis;
 //const { URL, WebSocket } = globalThis; // For linters.
@@ -102,7 +102,11 @@ export class NetworkClass {
     if (hashtag) message.hashtag = hashtag;
     if (act) message.act = act;
     //console.log('pub', message);
-    console.log(eventName, publisher, await deriveTopicId(publisher, eventName), message, await this.peer.pub(eventName, message, { publisher }));
+    //console.log(eventName, publisher, await deriveTopicId(publisher, eventName), message, await this.peer.pub(eventName, message, { publisher }));
+  }
+  pub1(topic, message, options) {
+    console.log(topic, message, options);
+    return this.peer.pub(topic, message, options);
   }
 }
 

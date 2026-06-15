@@ -2,10 +2,9 @@
 import process from 'node:process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { v4 as uuidv4 } from 'uuid';
 import { getContainingCells } from './s2.js';
 import { demoData, users } from './demo-data.js';
-import { NetworkClass, regionPublisher } from './network.js'; // Temporary hack. See file.
+import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag } from '@yz-social/civildefense.io';
 
 import { fetchStations, defaultRegions } from './station-data.js';
 const imageToUri = (await import('image-to-uri')).default;
@@ -60,38 +59,27 @@ const argv = yargs(hideBin(process.argv))
       .parse();
 
 const {externalBaseURL, info, verbose, radioStations, stationStyles, stationCount, stationRegion} = argv; // yargs puts values in argv.
-//if (info) console.log({externalBaseURL, network: NetworkClass.name});
-await NetworkClass.configure({/*externalBaseURL*/});
 
 // Create a p2p node and connect to the YZ network through externalBaseURL.
-// For more information, see https://github.com/YZ-social/kdht?tab=readme-ov-file#kdht, which is the p2p network used by Civil Defense.
-const contact = await NetworkClass.create({info, debug: verbose});
-await contact.connect({/*externalBaseURL*/});
-
-const networkVersion = 12;
-function publicEventName(tag) {
-  return `public:${networkVersion}:${tag}`
-}
-function alertEventName(cellTag, topicKey) {
-  return `civildefense.io:${networkVersion}:${cellTag}:${topicKey}`
-}
+const network = await P2PWebNetwork.create({region: {lat: 37.468467587148844, lng: -122.25860595703126}});
 
 // Publish the handle/avatar for each reporting user.
 for (const {tag, handle, avatar} of Object.values(users)) {
-  const eventName = publicEventName(tag);
-  if (handle) await contact.publish({ eventName, subject: 'handle', payload: handle });
-  if (avatar) await contact.publish({ eventName, subject: 'avatar', payload: imageToUri(`./images/${avatar}`) });
+  const eventName = agentTopic(tag);
+  const issuedTime = Date.now();
+  if (handle) await network.publish({eventName, type: 'handle', payload: handle, issuedTime});
+  if (avatar) await network.publish({eventName, type: 'avatar', payload: imageToUri(`./images/${avatar}`), issuedTime});
 }
 
 
-// Post to CivilDefense.io (local network or shared, depending on the externaBaseURL used by the contact).
+// Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
 async function publishEvent({lat, lng, // location on the globe
 			     eventTime, // Javscript timestamp
 			     source, // Name string of source. Please use a different one for each data source.
 			     // (Later this will involve signing by a public key. https://github.com/kilroy-code/distributed-security
 			     replies = [], // Additional information, if any.
 			     topicWithDefaultIcon, // Hashtag with a leading emoji used as an icon on the map.
-			     topicKey = topicWithDefaultIcon.replace(/^\p{Emoji}*\uFE0F?\s*/u, '') // Stripping off any leading emoji.
+			     topicKey = canonicalTag(topicWithDefaultIcon) // Stripping off any leading emoji.
 			    }) {
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
   const sourceTag = users[source].tag;
@@ -100,20 +88,20 @@ async function publishEvent({lat, lng, // location on the globe
   // If the user opens it, it has a timestamp and an identicon for the source string.
   // To do this, we actually publish to a series of different eventNames based on map position. See s2.js.
   const cells = getContainingCells(lat, lng);
-  const alertIdentifier = uuidv4(); // A unique identifier for this alert, which people will reply to.
   const payload = {lat, lng};
-  const publisher = regionPublisher(payload);
-  //console.log(source, lat, lng, topicWithDefaultIcon);
+  const publisher = P2PWebNetwork.regionPublisher(lat, lng);
+  let alertIdentifier;
   for (const cell of cells) {
-    const eventName = alertEventName(cell, topicKey);
-    await contact.publish({eventName, publisher, subject: alertIdentifier, payload, hashtag: topicWithDefaultIcon, act: sourceTag, issuedTime: eventTime});
+    const eventName = alertTopic(cell, topicKey);
+    const msgId = await network.publish({eventName, payload, hashtag: topicWithDefaultIcon, act: sourceTag, issuedTime: eventTime, publisher});
+    if (alertIdentifier && (alertIdentifier !== msgId)) throw new Error(`msgId drift ${alertIdentifier} => ${msgId}.`);
+    alertIdentifier = msgId;
   }
   if (!replies?.length) return alertIdentifier;
-  await contact.peer.sub(alertIdentifier, console.log, {publisher, since: 'all'});
+  //await contact.peer.sub(alertIdentifier, console.log, {publisher, since: 'all'});
   //await NetworkClass.delay(1e3);
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
     //console.log('reply', reply);
-    const replyIdentifier = uuidv4(); // A unique identifier for this reply.
     let payload = reply, replySource = sourceTag;
     if (reply.message) { // Each reply can be a string or an object with message and optional user and filename.
       const {message, user = source, filename} = reply;
@@ -124,14 +112,15 @@ async function publishEvent({lat, lng, // location on the globe
 	payload.name = filename;
       }
     }
-    await contact.publish({eventName: alertIdentifier, publisher, subject: replyIdentifier, payload, act: replySource});
+    eventTime += 1e3;
+    await network.publish({eventName: alertIdentifier, payload, act: replySource, issuedTime: eventTime, publisher});
   }
-  await NetworkClass.delay(1e3);
+  await P2PWebNetwork.delay(1e3);
   return alertIdentifier;
 }
 
 const url = new URL('/', externalBaseURL)
-const params = url.searchParams
+const params = url.searchParams;
   
 let dataToPublish;
 
@@ -161,10 +150,10 @@ for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of dataToPu
   params.set('lng', lng);
   params.set('sub', subject);
   params.set('tags', encodeURIComponent(tag));
-  console.log(url.href);
+  //console.log(url.href);
 }
 
 if (info) console.log('published');
-//await new Promise(resolve => setTimeout(resolve, 500));
-await contact.disconnect(true);
+//console.log('Staying connected to provide continuity, until we get multiple NodeJS nodes working.');
+await network.disconnect();
 if (info) console.log('done! winding down');
