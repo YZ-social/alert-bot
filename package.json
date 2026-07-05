@@ -1,10 +1,10 @@
 {
   "name": "alert-bot",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "description": "Adds data to civildefense.io.",
   "scripts": {
     "start": "node ./index.js",
-    "radio-stations": "node ./index.js --radio-stations --externalBaseURL https://civildefense.io/kdht/"
+    "cacheRadioStations": "node stationData.js"
   },
   "exports": {
     ".": "./index.js"
@@ -20,7 +20,7 @@
   "author": "howard.stearns@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "@yz-social/civildefense.io": "^1.0.5",
+    "@yz-social/civildefense.io": "^4.4.1",
     "image-to-uri": "^1.0.0",
     "s2js": "^1.44.0",
     "yargs": "^18.0.0"

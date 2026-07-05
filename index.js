@@ -10,6 +10,7 @@ import {styles as radioStyles, streamingRootPath} from './common.js';
 //globalThis.pica = (await import('pica')).default;
 //const imageToUri = (await import('image-to-uri')).default;
 
+const start = Date.now();
 process.title = 'alert-bot'; // Handy for debugging when you have lots of nodejs processes.
 
 // Command-line args. Here we use the yargs package to parse.
@@ -60,16 +61,22 @@ function makeURL({subject, lat, lng, tag}) {
 }
 
 // Create a p2p node and connect to the YZ network.
-const network = await P2PWebNetwork.create({region: {lat: 37.468467587148844, lng: -122.25860595703126}});
+const network = await P2PWebNetwork.create({
+  region: {lat: 37.468467587148844, lng: -122.25860595703126},
+  infoLogger: log
+});
 
+let totalPublications = 0;
 async function publish(options) { // Publish to network.
   const msgId = dryRun ? Date.now() : await network.publish(options);
+  totalPublications++;
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
   return msgId;
 }
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
-async function publishEvent({lat, lng, // location on the globe
+let totalAlerts = 0;
+async function publishAlert({lat, lng, // location on the globe
 			     eventTime = Date.now(), // Javscript timestamp
 			     source = 'alert-bot', // Name string of source. Please use a different one for each data source.
 			     // (Later this will involve signing by a public key. https://github.com/kilroy-code/distributed-security
@@ -92,9 +99,6 @@ async function publishEvent({lat, lng, // location on the globe
     const msgId = await publish({eventName, payload, hashtag: topicWithDefaultIcon, act: sourceTag, issuedTime: eventTime, publisher});
     alertIdentifier = msgId;
   }
-  if (!replies?.length) return alertIdentifier;
-  //await contact.peer.sub(alertIdentifier, console.log, {publisher, since: 'all'});
-  //await NetworkClass.delay(1e3);
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
     //console.log('reply', reply);
     let payload = reply, replySource = sourceTag;
@@ -112,12 +116,12 @@ async function publishEvent({lat, lng, // location on the globe
     eventTime += 1e3;
     await publish({eventName: alertIdentifier, payload, act: replySource, issuedTime: eventTime, publisher});
   }
+  totalAlerts++;
   if (!info) return;
   log(makeURL({subject: alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
   
   
-let dataToPublish;
 // Publish the handle/avatar for each reporting user.
 for (const {tag, handle, avatar} of Object.values(users)) {
   const eventName = agentTopic(tag);
@@ -136,7 +140,7 @@ for (const {tag, handle, avatar} of Object.values(users)) {
 //       const {lat, lng, name, url, mime, homepage} = station;
 //       const title = new URL(homepage).host.replace(/^www\./, '');
 //       console.log(title, name);
-//       const subject = await publishEvent({lat, lng, topicWithDefaultIcon: style, replies: [
+//       const subject = await publishAlert({lat, lng, topicWithDefaultIcon: style, replies: [
 // 	{message: `${title}: ${name} ${homepage} ${url}`}
 // ]});
 //       console.log(makeURL({subject, lat, lng, tag: style}));
@@ -146,10 +150,9 @@ for (const {tag, handle, avatar} of Object.values(users)) {
 
 // Post each datum.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
-  await publishEvent({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
+  await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
 }
 
-if (info) console.log('published');
-//console.log('Staying connected to provide continuity, until we get multiple NodeJS nodes working.');
+log(`Posted ${totalAlerts} alerts with ${totalPublications} publications in ${(Date.now() - start).toLocaleString()} ms.`);
 await network.disconnect();
-if (info) console.log('done! winding down');
+process.exit(0); // FIXME: This should not be necessary!
