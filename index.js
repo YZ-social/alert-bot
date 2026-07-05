@@ -27,10 +27,10 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Run with info logging."
       })
-      .option('styles', {
+      .option('tags', {
 	type: 'array',
-	default: radioStyles,
-	description: "Comma-separated list of styles to publish."
+	default: radioStyles.map(canonicalTag).concat('fire', 'ice', 'flood', 'help', 'cake'),
+	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
       })
       .option('throttleMS', {
 	type: 'number',
@@ -44,7 +44,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .parse();
 
-const {baseURL, info, styles, throttleMS, dryRun} = argv; // yargs puts values in argv.
+const {baseURL, info, tags, throttleMS, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
@@ -84,6 +84,7 @@ async function publishAlert({lat, lng, // location on the globe
 			     topicWithDefaultIcon, // Hashtag with a leading emoji used as an icon on the map.
 			     topicKey = canonicalTag(topicWithDefaultIcon) // Stripping off any leading emoji.
 			    }) {
+  if (!tags.includes(topicKey)) return;
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
   const sourceTag = users[source].tag;
  
@@ -130,23 +131,23 @@ for (const {tag, handle, avatar} of Object.values(users)) {
   //if (avatar) await publish({eventName, type: 'avatar', payload: imageToUri(`./images/${avatar}`), issuedTime});
 }
 
-//for (const code of ['80', '81', '86', '87', '88', '89', '54', '53', '4d', '4c']) {
-// for (const code of await readdir(streamingRootPath)) {
-//   for (const style of styles) {
-//     const path = `${streamingRootPath}/${code}/${style}.json`;
-//     const dataModule = await import(path, {with: { type: 'json' }}).catch(_ => {return {default: []};}); // Not all styles are present.
-//     console.log(path);
-//     for (const station of dataModule.default) {
-//       const {lat, lng, name, url, mime, homepage} = station;
-//       const title = new URL(homepage).host.replace(/^www\./, '');
-//       console.log(title, name);
-//       const subject = await publishAlert({lat, lng, topicWithDefaultIcon: style, replies: [
-// 	{message: `${title}: ${name} ${homepage} ${url}`}
-// ]});
-//       console.log(makeURL({subject, lat, lng, tag: style}));
-//     }
-//   }
-// }
+for (const code of await readdir(streamingRootPath)) {
+  const codeDir = `${streamingRootPath}/${code}`;
+  for (const styleFileName of await readdir(codeDir)) {
+    const style = styleFileName.slice(0, -'.json'.length);
+    if (!tags.includes(canonicalTag(style))) continue; // optimization
+    const path = `${codeDir}/${styleFileName}`;
+    const dataModule = await import(path, {with: { type: 'json' }})
+	  .catch(_ => {return {default: []};}); // Not all styles are present.
+    for (const station of dataModule.default) {
+      const {lat, lng, name, url, mime, homepage} = station;
+      const title = new URL(homepage).host.replace(/^www\./, '');
+      const subject = await publishAlert({lat, lng, topicWithDefaultIcon: style, replies: [
+	{message: `${title}: ${name} ${homepage} ${url}`}
+      ]});
+    }
+  }
+}
 
 // Post each datum.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
