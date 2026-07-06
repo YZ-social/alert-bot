@@ -19,9 +19,9 @@ function ago(targetMinutes, rangeMinutes = 1) { // Return a random time approxim
 }
 
 export const users = {
-  ['alert-bot']: {tag: '675f4343-2498-4a73-86eb-ebb2cf0ec95b', handle: 'alert-bot', avatar: 'alert-bot.png'},
-  user2: {tag: '262fc0d0-64cd-4bfc-8467-80ea46fd9c3c', handle: 'alice', avatar: 'alice.jpeg'},
-  user3: {tag: 'a5ad0210-d845-4764-8e95-9d473da364b6', handle: 'bob', avatar: 'bob.png'}
+  ['alert-bot']: {handle: 'alert-bot', avatar: 'alert-bot.jpg', dump: '{"kind":"author","pubkey":"5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b","privkey":"MC4CAQAwBQYDK2VwBCIEIIb8LcDnTDWtOWCAm8OxxUGn/pmCQD4NDRW/DvqVdxMW","createdAt":1783202744364}'},
+  user2: {handle: 'alice', avatar: 'alice.jpeg', dump: '{"kind":"author","pubkey":"d9980054573d559bd65459426a2ffd64ac384fb9de5fa2d2eb1334f1dbd9ab20","privkey":"MC4CAQAwBQYDK2VwBCIEIPpQLxN9mNrDZebALJz1jb03lpEMQ6I1wAQ+Yg4/2vHV","createdAt":1783300645760}'},
+  user3: {handle: 'bob', avatar: 'bob.jpg', dump: '{"kind":"author","pubkey":"66ae6f79c7458e5393c2d80c3cb6dabf614e3e7085dbfd3dd388d5a4d0b5171b","privkey":"MC4CAQAwBQYDK2VwBCIEIMTEQ6txMRj6io/i9HMF9p7Vt9R+Dyck6hfMTD1j+IPQ","createdAt":1783300703080}'}
 };
 
 // Note: The civildefense.io app downsizes alert images at the client to be no larger than 1024 on the longer dimension,
@@ -53,7 +53,7 @@ export const demoData = [
   ]},
 
   // Flood
-  {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: flood},
+  {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: flood, replies: [{message: 'Maybe the damn burst will put the fire out?', user: 'user2'}]},
 
   // Ice
   {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: ice},
@@ -61,9 +61,9 @@ export const demoData = [
   {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: ice},
   {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: ice/*, replies: "They aren't stopping!"*/},
   {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(1), tag: ice, replies: [
-    {message: "This is what I'm seeing", user: 'user2',
-     //filename: "ice-image.png"
+    {message: "Avoid this area!", user: 'user2',
+     filename: "ice-image.jpg"
     },
-    {message: "omg!", user: 'user3'}
+    {message: "Heading south", user: 'user3'}
   ]}
 ];

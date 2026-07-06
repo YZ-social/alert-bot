@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import process from 'node:process';
-import {readdir} from 'node:fs/promises';
+import { readdir, open, rm, appendFile } from 'node:fs/promises';
+import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { getContainingCells } from './s2.js';
 import { demoData, users } from './demo-data.js';
 import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
-//globalThis.pica = (await import('pica')).default;
-//const imageToUri = (await import('image-to-uri')).default;
+const imageToUri = (await import('image-to-uri')).default;
 
 const start = Date.now();
 process.title = 'alert-bot'; // Handy for debugging when you have lots of nodejs processes.
@@ -32,9 +32,14 @@ const argv = yargs(hideBin(process.argv))
 	default: radioStyles.map(canonicalTag).concat('fire', 'ice', 'flood', 'help', 'cake'),
 	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
       })
+      .option('kill', {
+	type: 'boolean',
+	default: true,
+	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
+      })
       .option('throttleMS', {
 	type: 'number',
-	default: 100,
+	default: 30,
 	description: "Number of milliseconds to pause between publish actions."
       })
       .option('dryRun', {
@@ -44,7 +49,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .parse();
 
-const {baseURL, info, tags, throttleMS, dryRun} = argv; // yargs puts values in argv.
+const {baseURL, info, tags, kill, throttleMS, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
@@ -66,58 +71,99 @@ const network = await P2PWebNetwork.create({
   infoLogger: log
 });
 
+async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
+  let user = users[source];
+  // A truthy user.identity is used in signWith, and also indicates that it was used this run.
+  user.identity ||= await P2PWebNetwork.createAuthorIdentity({persistAs: source, store: {
+    set(key, value) { /* noop */ },
+    get(key) { return user.dump; }
+  }});
+  if (!region) return user.identity;
+  const regions = (user.regions ||= []);
+  if (!regions.includes(region)) regions.push(region);
+  return user.identity
+}
+
+let totalKilled = 0;
+if (kill) { // Delete everything that had been recorded in killCache.txt in previous runs, and then delete the file.
+  const file = await open('killCache.txt').catch(error => (error.code !== 'ENOENT') && console.error(error));
+  if (file) {
+    for await (const line of file.readLines()) {
+      let {eventName, region, owner, subject, source} = JSON.parse(line);
+      const signWith = await getUserIdentity(source);
+      //console.log('kill', eventName, region, subject, signWith.authorId);
+      if (!dryRun) {
+	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
+	for (const msgId of subject) {
+	  await network.publish({eventName, region, owner, subject:msgId, signWith});
+	  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
+	}
+      }
+      totalKilled++;
+    }
+    rm('killCache.txt');
+  }
+}
+
+function recordForKill({eventName, region, owner, subject, source}) { // Add to Record in killCache.txt.
+  return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, subject, source}) + EOL, 'utf8');
+}
+
 let totalPublications = 0;
-async function publish(options) { // Publish to network.
-  const msgId = dryRun ? Date.now() : await network.publish(options);
+async function publish({eventName, region, source, ...options}) { // Publish to network.
+  const signWith = await getUserIdentity(source, region);
+  //console.log('publish', eventName, region, options, signWith.authorId);
+  const subject = dryRun ? Date.now() : await network.publish({eventName, region, ...options, signWith});
+  await recordForKill({eventName, region, subject, source});
   totalPublications++;
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
-  return msgId;
+  return subject;
 }
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
 let totalAlerts = 0;
 async function publishAlert({lat, lng, // location on the globe
 			     eventTime = Date.now(), // Javscript timestamp
-			     source = 'alert-bot', // Name string of source. Please use a different one for each data source.
-			     // (Later this will involve signing by a public key. https://github.com/kilroy-code/distributed-security
+			     source = 'alert-bot', // Identifier key in users dictionary. (Not the handle.)
 			     replies = [], // Additional information, if any.
 			     topicWithDefaultIcon, // Hashtag with a leading emoji used as an icon on the map.
 			     topicKey = canonicalTag(topicWithDefaultIcon) // Stripping off any leading emoji.
 			    }) {
   if (!tags.includes(topicKey)) return;
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
-  const sourceTag = users[source].tag;
-  users[source].referenced = true;
  
   // First we publish the "alert" - which will appear as an icon on the map.  
   // If the user opens it, it has a timestamp and an identicon for the source string.
   // To do this, we actually publish to a series of different eventNames based on map position. See s2.js.
+  const region = P2PWebNetwork.regionCode(lat, lng);
   const cells = getContainingCells(lat, lng);
   const payload = {lat, lng};
-  const publisher = 'FIXME' //P2PWebNetwork.regionPublisher(lat, lng);
   let alertIdentifier;
   for (const cell of cells) {
     const eventName = alertTopic(cell, topicKey);
-    const msgId = await publish({eventName, payload, hashtag: topicWithDefaultIcon, act: sourceTag, issuedTime: eventTime, publisher});
+    const msgId = await publish({eventName, region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source});
     alertIdentifier = msgId;
   }
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
-    //console.log('reply', reply);
-    let payload = reply, replySource = sourceTag;
+    let payload = reply, replySource = source;
     if (reply.message) { // Each reply can be a string or an object with message and optional user and filename.
       const {message, user = source, filename} = reply;
+      replySource = user;
       payload = {message};
-      replySource = users[user].tag;
-      users[user].referenced = true;
-      // if (filename) {
-      // 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
-      // 	payload.file = await network.chunkifyString(dataURL, publisher);
-      // 	payload.name = filename;
-      // 	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
-      // }
+      if (filename) {
+	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
+	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
+	const signWith = await getUserIdentity(source, region);
+	const {topic:file, msgIds} = await network.chunkifyBlob({blob, region, signWith, maxDimension: 0});
+	payload.file = file;
+	const {name, owner} = file;
+	recordForKill({eventName:name, region, owner, subject: msgIds, source});
+	payload.name = filename;
+	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
+      }
     }
     eventTime += 1e3;
-    await publish({eventName: alertIdentifier, payload, act: replySource, issuedTime: eventTime, publisher});
+    await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, source: replySource});
   }
   totalAlerts++;
   if (!info) return;
@@ -149,16 +195,18 @@ for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData
 }
 
 // Publish the handle/avatar for each reporting user.
-for (const {tag, handle, avatar, referenced} of Object.values(users)) {
-  if (!referenced) continue;
-  const eventName = agentTopic(tag);
+for (const key of Object.keys(users)) {
+  const {handle, avatar, identity, regions = []} = users[key];
   const issuedTime = Date.now();
-  if (handle) await publish({eventName, type: 'handle', payload: handle, issuedTime});
-  //if (avatar) await publish({eventName, type: 'avatar', payload: imageToUri(`./images/${avatar}`), issuedTime});
-  console.log(handle);
+  for (const region of regions) {
+    const owner = identity.authorId;
+    if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
+    if (avatar) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
+  }
 }
 
 
 log(`Posted ${totalAlerts} alerts with ${totalPublications} publications in ${(Date.now() - start).toLocaleString()} ms.`);
+await P2PWebNetwork.delay(10e3); // Longer time to allow for migration of data to other roots.
 await network.disconnect();
 process.exit(0); // FIXME: This should not be necessary!
