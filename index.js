@@ -87,6 +87,7 @@ async function publishAlert({lat, lng, // location on the globe
   if (!tags.includes(topicKey)) return;
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
   const sourceTag = users[source].tag;
+  users[source].referenced = true;
  
   // First we publish the "alert" - which will appear as an icon on the map.  
   // If the user opens it, it has a timestamp and an identicon for the source string.
@@ -107,6 +108,7 @@ async function publishAlert({lat, lng, // location on the globe
       const {message, user = source, filename} = reply;
       payload = {message};
       replySource = users[user].tag;
+      users[user].referenced = true;
       // if (filename) {
       // 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
       // 	payload.file = await network.chunkifyString(dataURL, publisher);
@@ -123,14 +125,6 @@ async function publishAlert({lat, lng, // location on the globe
 }
   
   
-// Publish the handle/avatar for each reporting user.
-for (const {tag, handle, avatar} of Object.values(users)) {
-  const eventName = agentTopic(tag);
-  const issuedTime = Date.now();
-  if (handle) await publish({eventName, type: 'handle', payload: handle, issuedTime});
-  //if (avatar) await publish({eventName, type: 'avatar', payload: imageToUri(`./images/${avatar}`), issuedTime});
-}
-
 for (const code of await readdir(streamingRootPath)) {
   const codeDir = `${streamingRootPath}/${code}`;
   for (const styleFileName of await readdir(codeDir)) {
@@ -153,6 +147,17 @@ for (const code of await readdir(streamingRootPath)) {
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
   await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
 }
+
+// Publish the handle/avatar for each reporting user.
+for (const {tag, handle, avatar, referenced} of Object.values(users)) {
+  if (!referenced) continue;
+  const eventName = agentTopic(tag);
+  const issuedTime = Date.now();
+  if (handle) await publish({eventName, type: 'handle', payload: handle, issuedTime});
+  //if (avatar) await publish({eventName, type: 'avatar', payload: imageToUri(`./images/${avatar}`), issuedTime});
+  console.log(handle);
+}
+
 
 log(`Posted ${totalAlerts} alerts with ${totalPublications} publications in ${(Date.now() - start).toLocaleString()} ms.`);
 await network.disconnect();
