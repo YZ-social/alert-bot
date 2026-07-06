@@ -5,7 +5,7 @@ import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { demoData, users } from './demo-data.js';
-import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells } from '@yz-social/civildefense.io';
+import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
 
@@ -81,10 +81,7 @@ function makeURL({subject, lat, lng, tag}) {
 }
 
 // Create a p2p node and connect to the YZ network.
-const network = await P2PWebNetwork.create({
-  region: {lat: 37.468467587148844, lng: -122.25860595703126},
-  infoLogger: log
-});
+const network = await P2PWebNetwork.create({region: regions ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
 
 async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
   let user = users[source];

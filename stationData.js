@@ -49,6 +49,7 @@ function log(...rest) { // If info, log args (with newline at end).
   console.log(...rest);
 }
 
+const homepages = new Set(); // For dedupping.
 export async function fetchStations(styles) {
   const start = Date.now();
   const codesData = {}; // Maps Axon code => {[style], [stationData...]}
@@ -81,6 +82,8 @@ export async function fetchStations(styles) {
       }
       for (const {geo_lat, geo_long, name, url, homepage, favicon} of data) {
 	if (!geo_lat || !geo_long || !homepage) continue;
+	if (homepages.has(homepage)) continue; // Dedupe by homepage.
+	homepages.add(homepage);
 	const mime = audioMap[extname(url).replace(/^\./, '')];
 	if (!mime) continue;
 	const lat = parseFloat(geo_lat);
