@@ -4,9 +4,8 @@ import { readdir, open, rm, appendFile } from 'node:fs/promises';
 import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { getContainingCells } from './s2.js';
 import { demoData, users } from './demo-data.js';
-import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag } from '@yz-social/civildefense.io';
+import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
 
@@ -27,10 +26,21 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Run with info logging."
       })
+      .option('verbose', {
+	alias: 'v',
+	type: 'boolean',
+	default: false,
+	description: "Run with extra debug logging."
+      })
       .option('tags', {
-	type: 'array',
+	type: 'string', array: true,
 	default: radioStyles.map(canonicalTag).concat('fire', 'ice', 'flood', 'help', 'cake'),
 	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
+      })
+      .option('regions', {
+	type: 'string', array: true,
+	default: null,
+	description: "Restrict publication to these hex-code regions. (Empty means no restriction.)"
       })
       .option('kill', {
 	type: 'boolean',
@@ -47,12 +57,17 @@ const argv = yargs(hideBin(process.argv))
 	default: false,
 	description: "Skip actual publication."
       })
+      .strict()
       .parse();
 
-const {baseURL, info, tags, kill, throttleMS, dryRun} = argv; // yargs puts values in argv.
+const {baseURL, info, verbose, tags, regions, kill, throttleMS, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
+  console.log(...rest);
+}
+function debug(...rest) { // If info, log args (with newline at end).
+  if (!verbose) return;
   console.log(...rest);
 }
 const url = new URL('/', baseURL)
@@ -91,7 +106,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
     for await (const line of file.readLines()) {
       let {eventName, region, owner, subject, source} = JSON.parse(line);
       const signWith = await getUserIdentity(source);
-      //console.log('kill', eventName, region, subject, signWith.authorId);
+      debug('kill', eventName, region, subject, signWith.authorId);
       if (!dryRun) {
 	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
 	for (const msgId of subject) {
@@ -112,8 +127,8 @@ function recordForKill({eventName, region, owner, subject, source}) { // Add to 
 let totalPublications = 0;
 async function publish({eventName, region, source, ...options}) { // Publish to network.
   const signWith = await getUserIdentity(source, region);
-  //console.log('publish', eventName, region, options, signWith.authorId);
   const subject = dryRun ? Date.now() : await network.publish({eventName, region, ...options, signWith});
+  debug('publish', eventName, region, options, source, signWith.authorId, subject);
   await recordForKill({eventName, region, subject, source});
   totalPublications++;
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
@@ -170,8 +185,8 @@ async function publishAlert({lat, lng, // location on the globe
   log(makeURL({subject: alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
   
-  
 for (const code of await readdir(streamingRootPath)) {
+  if (regions && !regions.includes(code)) continue;
   const codeDir = `${streamingRootPath}/${code}`;
   for (const styleFileName of await readdir(codeDir)) {
     const style = styleFileName.slice(0, -'.json'.length);
@@ -191,6 +206,7 @@ for (const code of await readdir(streamingRootPath)) {
 
 // Post each datum.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
+  if (regions && !regions.includes(P2PWebNetwork.regionCode(lat, lng))) continue;
   await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
 }
 
