@@ -203,7 +203,8 @@ for (const code of await readdir(streamingRootPath)) {
 
 // Post each datum.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
-  if (regions && !regions.includes(P2PWebNetwork.regionCode(lat, lng))) continue;
+  const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
+  if (regions && !regions.includes(region)) continue;
   await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
 }
 
@@ -222,4 +223,3 @@ for (const key of Object.keys(users)) {
 log(`Posted ${totalAlerts} alerts with ${totalPublications} publications in ${(Date.now() - start).toLocaleString()} ms.`);
 await P2PWebNetwork.delay(10e3); // Longer time to allow for migration of data to other roots.
 await network.disconnect();
-process.exit(0); // FIXME: This should not be necessary!
