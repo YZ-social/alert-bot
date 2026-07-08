@@ -49,6 +49,11 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
       })
+      .option('subTimeoutS', {
+	type: 'number',
+	default: 20,
+	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received."
+      })
       .option('throttleMS', {
 	type: 'number',
 	default: 150,
@@ -62,7 +67,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-const {baseURL, info, verbose, tags, regions, kill, throttleMS, dryRun} = argv; // yargs puts values in argv.
+const {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
@@ -81,9 +86,12 @@ function makeURL({subject, lat, lng, tag}) {
   params.set('tags', encodeURIComponent(tag));
   return url.href;
 }
+function create() {
+  return P2PWebNetwork.create({region: regions?.length ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
+}
 
 // Create a p2p node and connect to the YZ network.
-const network = await P2PWebNetwork.create({region: regions?.length ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
+let network = await create();
 
 async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
   let user = users[source];
@@ -119,17 +127,28 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
   }
 }
 
-function recordForKill({eventName, region, owner, subject, source}) { // Add to Record in killCache.txt.
+function recordForKill({eventName, region, owner, subject, source}) { // Asynchronously add to Record in killCache.txt.
   return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, subject, source}) + EOL, 'utf8');
 }
-
 let totalPublications = 0;
-async function publish({eventName, region, source, ...options}) { // Publish to network.
+const topics = {}; // Map topic JSON string => {nPublished, isChunk, nReceived};
+function countTopic(topic, subject) {
+  const topicKey = JSON.stringify(topic);
+  const isChunk = Array.isArray(subject);
+  topics[topicKey] ??= {nPublished: 0, isChunk, nReceived: 0};
+  topics[topicKey].nPublished += 1;
+  totalPublications += isChunk ? subject.length : 1;
+}
+function record({eventName, region, owner, subject, source}) { // Asynchronously recordForKill and countTopic
+  countTopic({name: eventName, region, owner}, subject);
+  return recordForKill({eventName, region, owner, subject, source});
+}
+
+async function publish({eventName, region, owner, source, ...options}) { // Publish to network.
   const signWith = await getUserIdentity(source, region);
-  const subject = dryRun ? Date.now() : await network.publish({eventName, region, ...options, signWith});
-  debug('publish', eventName, region, options, source, signWith.authorId, subject);
-  await recordForKill({eventName, region, subject, source});
-  totalPublications++;
+  const subject = dryRun ? Date.now() : await network.publish({eventName, region, owner, ...options, signWith});
+  debug('publish', eventName, region, source, signWith.authorId, subject);
+  await record({eventName, region, owner, subject, source});
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
   return subject;
 }
@@ -169,10 +188,12 @@ async function publishAlert({lat, lng, // location on the globe
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
 	const signWith = await getUserIdentity(source, region);
 	const {topic:file, msgIds} = await network.chunkifyBlob({blob, region, signWith, maxDimension: 0});
+	debug('publish chunk', file, msgIds.length, 'chunks.');
 	totalPublications += msgIds.length;
 	payload.file = file;
+	countTopic(file);
 	const {name, owner} = file;
-	recordForKill({eventName:name, region, owner, subject: msgIds, source});
+	await record({eventName:name, region, owner, subject: msgIds, source});
 	payload.name = filename;
 	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
       }
@@ -225,6 +246,32 @@ for (const key of Object.keys(users)) {
 }
 
 
-log(`Posted ${totalAlerts} alerts with ${totalPublications} publications, and ${totalKilled} killed, in ${(Date.now() - start).toLocaleString()} ms.`);
+log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
 await P2PWebNetwork.delay(10e3); // Longer time to allow for migration of data to other roots.
 await network.disconnect();
+
+if (!dryRun && subTimeoutS) {
+  log(`Now listening for ${subTimeoutS} seconds to confirm delivery.`);
+  // Subscribe to everything in parallel.
+  network = await create();
+  await Promise.all(Object.keys(topics).map(topicString => {
+    const {name, region, owner} = JSON.parse(topicString);
+    const topicData = topics[topicString];
+    const handler = ({deleted}) => {
+      topicData.nReceived++;
+      debug(deleted ? 'deleted' : 'received', topicString);
+    };
+    return topicData.isChunk ?
+      network.assembleChunkedDataURL({name, region, owner}) :
+      network.subscribe({eventName: name, region, owner, handler});
+  }));
+  // Wait for everyone to report.
+  await P2PWebNetwork.delay(subTimeoutS * 1e3);
+  await network.disconnect();
+  // Report any incorrect results.
+  for (const topicString in topics) {
+    const {nPublished, nReceived} = topics[topicString];
+    if (nPublished === nReceived) continue;
+    console.log(`Topic ${topicString} published ${nPublished} but received ${nReceived}!`);
+  }
+}
