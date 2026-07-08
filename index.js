@@ -49,6 +49,11 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
       })
+      .option('pauseS', {
+	type: 'number',
+	default: 10,
+	description: "Number of seconds to wait after all publications, before either confirming or quitting."
+      })
       .option('subTimeoutS', {
 	type: 'number',
 	default: 20,
@@ -247,7 +252,7 @@ for (const key of Object.keys(users)) {
 
 
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
-await P2PWebNetwork.delay(10e3); // Longer time to allow for migration of data to other roots.
+await P2PWebNetwork.delay(pauseS * 1e3); // Longer time to allow for migration of data to other roots.
 await network.disconnect();
 
 if (!dryRun && subTimeoutS) {
