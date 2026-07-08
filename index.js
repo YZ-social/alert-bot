@@ -20,7 +20,7 @@ const argv = yargs(hideBin(process.argv))
       .usage(`Publish CivilDefense.io alerts.`)
       .option('baseURL', {
 	type: 'string',
-	default: 'http://localhost:3000/',
+	default: 'https://civildefense.io/',
 	description: "The base URL where the results can be reached."
       })
       .option('info', {
