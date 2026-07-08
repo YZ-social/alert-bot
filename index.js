@@ -4,13 +4,16 @@ import { readdir, open, rm, appendFile } from 'node:fs/promises';
 import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { demoData, users } from './demo-data.js';
+import { demoData, users, styles as demoStyles } from './demo-data.js';
 import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
 
 const start = Date.now();
 process.title = 'alert-bot'; // Handy for debugging when you have lots of nodejs processes.
+const extendedStyles = radioStyles.concat(demoStyles);
+const extendedMap = {}
+extendedStyles.forEach(extended => extendedMap[canonicalTag(extended)] = extended);
 
 // Command-line args. Here we use the yargs package to parse.
 const argv = yargs(hideBin(process.argv))
@@ -38,8 +41,7 @@ const argv = yargs(hideBin(process.argv))
 	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
       })
       .option('regions', {
-	type: 'string', array: true,
-	default: null,
+	type: 'array', string: true,
 	description: "Restrict publication to these hex-code regions. (Empty means no restriction.)"
       })
       .option('kill', {
@@ -49,7 +51,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('throttleMS', {
 	type: 'number',
-	default: 30,
+	default: 150,
 	description: "Number of milliseconds to pause between publish actions."
       })
       .option('dryRun', {
@@ -81,7 +83,7 @@ function makeURL({subject, lat, lng, tag}) {
 }
 
 // Create a p2p node and connect to the YZ network.
-const network = await P2PWebNetwork.create({region: regions ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
+const network = await P2PWebNetwork.create({region: regions?.length ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
 
 async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
   let user = users[source];
@@ -113,7 +115,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
       }
       totalKilled++;
     }
-    rm('killCache.txt');
+    if (!dryRun) rm('killCache.txt');
   }
 }
 
@@ -167,6 +169,7 @@ async function publishAlert({lat, lng, // location on the globe
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
 	const signWith = await getUserIdentity(source, region);
 	const {topic:file, msgIds} = await network.chunkifyBlob({blob, region, signWith, maxDimension: 0});
+	totalPublications += msgIds.length;
 	payload.file = file;
 	const {name, owner} = file;
 	recordForKill({eventName:name, region, owner, subject: msgIds, source});
@@ -187,14 +190,16 @@ for (const code of await readdir(streamingRootPath)) {
   const codeDir = `${streamingRootPath}/${code}`;
   for (const styleFileName of await readdir(codeDir)) {
     const style = styleFileName.slice(0, -'.json'.length);
-    if (!tags.includes(canonicalTag(style))) continue; // optimization
+    const canonical = canonicalTag(style)
+    if (!tags.includes(canonical)) continue; // optimization
+    const extended = extendedMap[canonical];
     const path = `${codeDir}/${styleFileName}`;
     const dataModule = await import(path, {with: { type: 'json' }})
 	  .catch(_ => {return {default: []};}); // Not all styles are present.
     for (const station of dataModule.default) {
       const {lat, lng, name, url, mime, homepage} = station;
       const title = new URL(homepage).host.replace(/^www\./, '');
-      const subject = await publishAlert({lat, lng, topicWithDefaultIcon: style, replies: [
+      const subject = await publishAlert({lat, lng, topicWithDefaultIcon: extended, replies: [
 	{message: `${title}: ${name} ${homepage} ${url}`}
       ]});
     }
@@ -220,6 +225,6 @@ for (const key of Object.keys(users)) {
 }
 
 
-log(`Posted ${totalAlerts} alerts with ${totalPublications} publications in ${(Date.now() - start).toLocaleString()} ms.`);
+log(`Posted ${totalAlerts} alerts with ${totalPublications} publications, and ${totalKilled} killed, in ${(Date.now() - start).toLocaleString()} ms.`);
 await P2PWebNetwork.delay(10e3); // Longer time to allow for migration of data to other roots.
 await network.disconnect();

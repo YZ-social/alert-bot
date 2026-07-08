@@ -8,9 +8,8 @@ import {styles as allStyles, streamingRootPath as defaultStreamingRootPath} from
 const argv = yargs(hideBin(process.argv))
       .usage(`Collect station data from https://www.radio-browser.info/ and write to streaming-radio/<code>/<style>.json`)
       .option('styles', {
-	type: 'array',
-	string: true,
-	default: allStyles,
+	type: 'string', array: true,
+	default: allStyles.map(canonicalTag),
 	description: "A list of styles to gather."
       })
       .option('root', {
@@ -24,6 +23,12 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Run with info logging."
       })
+      .option('checkStreams', {
+	type: 'boolean',
+	default: true,
+	description: "Check that the announced stream actually works."
+      })
+      .strict()
       .parse();
 const {info, styles, root:streamingRootPath} = argv;
 const styleMap = {}; // maps, e.g., "news" => "🎙️ news";
@@ -37,7 +42,10 @@ const audioMap = {
   opus: 'audio/ogg',
   m4a: 'audio/mp4',
   m3u8: 'audio/x-mpegurl',
-  mpd: 'application/dash+xml'
+  mp3u: 'audio/x-mpegurl',
+  mpu: 'audio/x-mpegurl',
+  mpd: 'application/dash+xml',
+  // pls: 'audio/x-scpls' // Players gotta play
 }
 
 function tick(string = ".") { // If info, lock string without newlines.
@@ -47,6 +55,15 @@ function tick(string = ".") { // If info, lock string without newlines.
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
   console.log(...rest);
+}
+async function safeFetch(url) { // fetch(url), but instead of throwing, log the error and answer falsy.
+  const response = await fetch(url)
+	.catch(error => log(url, error.cause?.message || error.cause || error.message));
+  if (!response) return null;
+  if (!response.ok) return log(url, response.statusText);
+  const size = response.headers.get('content-length');
+  if (size && !parseInt(size)) return log(url, "Empty");
+  return response;
 }
 
 const homepages = new Set(); // For dedupping.
@@ -73,19 +90,16 @@ export async function fetchStations(styles) {
       apiUrl.searchParams.set('limit', perQueryCount);
       apiUrl.searchParams.set('offset', offset);
       offset += perQueryCount;
-      const response = await fetch(apiUrl.toString());
-      if (response.ok) {
-	data = await response.json();
-      } else {
-	console.error(response.statusText, apiUrl);
-	break;
-      }
+      const response = await safeFetch(apiUrl.toString());
+      if (!response) break;
+      data = await response.json();
       for (const {geo_lat, geo_long, name, url, homepage, favicon} of data) {
 	if (!geo_lat || !geo_long || !homepage) continue;
 	if (homepages.has(homepage)) continue; // Dedupe by homepage.
-	homepages.add(homepage);
 	const mime = audioMap[extname(url).replace(/^\./, '')];
 	if (!mime) continue;
+	if (!(await safeFetch(url))) continue;
+	homepages.add(homepage);
 	const lat = parseFloat(geo_lat);
 	const lng = parseFloat(geo_long);
 	const code = P2PWebNetwork.regionCode(lat, lng).toString(16).padStart(2, '0');
