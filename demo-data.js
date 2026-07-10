@@ -64,6 +64,7 @@ export const demoData = [
 
   // Flood
   {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: flood, replies: [{message: 'Maybe the damn burst will put the fires out?', user: 'user2'}]},
+  {lat: 50, lng: 17, eventTime: ago(1), tag: flood, replies: [{message: 'Canned data in eastern europe', user: 'user2'}]},
 
   // Ice
   {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: ice},

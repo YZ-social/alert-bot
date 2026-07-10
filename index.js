@@ -49,14 +49,34 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
       })
-      .option('pauseS', {
+      .option('pauseBeforeDeleteS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait between joining and deleting."
+      })
+      .option('pauseBeforePublishS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait after joining-or-deleting, before we start to publish."
+      })
+      .option('pauseAfterPublishS', {
 	type: 'number',
 	default: 10,
-	description: "Number of seconds to wait after all publications, before either confirming or quitting."
+	description: "Number of seconds to wait after all publications, before disconnecting."
+      })
+      .option('pauseBeforeRestartS', {
+	type: 'number',
+	default: 45,
+	description: "Number of seconds to wait between disconnecting and re-joining for confirmation."
+      })
+      .option('pauseBeforeSubscribeS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait between re-joining and subscribing."
       })
       .option('subTimeoutS', {
 	type: 'number',
-	default: 20,
+	default: 30,
 	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received."
       })
       .option('throttleMS', {
@@ -72,16 +92,27 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-const {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, dryRun} = argv; // yargs puts values in argv.
+const {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
-  console.log(...rest);
+  console.log(new Date().toLocaleTimeString(), ...rest);
+}
+function blankLine() { // If info, log a blank line.
+  if (info) console.log();
 }
 function debug(...rest) { // If info, log args (with newline at end).
   if (!verbose) return;
   console.log(...rest);
 }
+function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePublishS} seconds before publishing.`
+  // Tagged template function that logs the interpolated string and pauses the first value amount of seconds.
+  const zipped = strings.map((k, i) => [k, values[i] ?? '']).flat();
+  const ms = values[0] * 1e3;
+  log(zipped.join(''));
+  return P2PWebNetwork.delay(ms);
+}
+
 const url = new URL('/', baseURL)
 const params = url.searchParams;
 function makeURL({subject, lat, lng, tag}) {
@@ -115,6 +146,7 @@ let totalKilled = 0;
 if (kill) { // Delete everything that had been recorded in killCache.txt in previous runs, and then delete the file.
   const file = await open('killCache.txt').catch(error => (error.code !== 'ENOENT') && console.error(error));
   if (file) {
+    await pause`Waiting ${pauseBeforeDeleteS} seconds before deleting previous run's publications.`;
     for await (const line of file.readLines()) {
       let {eventName, region, owner, subject, source} = JSON.parse(line);
       const signWith = await getUserIdentity(source);
@@ -210,7 +242,10 @@ async function publishAlert({lat, lng, // location on the globe
   if (!info) return;
   log(makeURL({subject: alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
-  
+
+await pause`Waiting ${pauseBeforePublishS} seconds before publishing.`;
+blankLine();
+
 for (const code of await readdir(streamingRootPath)) {
   if (regions && !regions.includes(code)) continue;
   const codeDir = `${streamingRootPath}/${code}`;
@@ -251,32 +286,48 @@ for (const key of Object.keys(users)) {
 }
 
 
+blankLine();
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
-await P2PWebNetwork.delay(pauseS * 1e3); // Longer time to allow for migration of data to other roots.
+await pause`Waiting ${pauseAfterPublishS} seconds before disconnecting the publishing node.`;
 await network.disconnect();
 
 if (!dryRun && subTimeoutS) {
-  log(`Now listening for ${subTimeoutS} seconds to confirm delivery.`);
+  blankLine();
+  await pause`Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery.`;
   // Subscribe to everything in parallel.
   network = await create();
-  await Promise.all(Object.keys(topics).map(topicString => {
+  await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
+  const topicStrings = Object.keys(topics);
+  log(`Subscribing to ${topicStrings.length} topics.`);
+  const receivedAll = [];
+  await Promise.all(topicStrings.map(topicString => {
     const {name, region, owner} = JSON.parse(topicString);
     const topicData = topics[topicString];
+    const {promise, resolve} = Promise.withResolvers();
     const handler = ({deleted}) => {
       topicData.nReceived++;
       debug(deleted ? 'deleted' : 'received', topicString);
+      if (topicData.nReceived >= topicData.nPublished) resolve();
     };
+    receivedAll.push(promise);
     return topicData.isChunk ?
       network.assembleChunkedDataURL({name, region, owner}) :
       network.subscribe({eventName: name, region, owner, handler});
   }));
   // Wait for everyone to report.
-  await P2PWebNetwork.delay(subTimeoutS * 1e3);
-  await network.disconnect();
   // Report any incorrect results.
+  const start = Date.now();
+  const success = await Promise.race([
+    Promise.all(receivedAll),
+    pause`Waiting up to ${subTimeoutS} seconds for subscriptions to fire.`
+  ]);
+  if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
+  else log("FAILED to receive all events.");
   for (const topicString in topics) {
     const {nPublished, nReceived} = topics[topicString];
     if (nPublished === nReceived) continue;
-    console.log(`Topic ${topicString} published ${nPublished} but received ${nReceived}!`);
+    log(`Topic ${topicString} published ${nPublished} but received ${nReceived}!`);
   }
+  await network.disconnect();
 }
+log('Done.');
