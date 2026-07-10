@@ -61,12 +61,12 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('pauseAfterPublishS', {
 	type: 'number',
-	default: 10,
+	default: 0,
 	description: "Number of seconds to wait after all publications, before disconnecting."
       })
       .option('pauseBeforeRestartS', {
 	type: 'number',
-	default: 45,
+	default: 0,
 	description: "Number of seconds to wait between disconnecting and re-joining for confirmation."
       })
       .option('pauseBeforeSubscribeS', {
@@ -76,7 +76,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('subTimeoutS', {
 	type: 'number',
-	default: 30,
+	default: 65,
 	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received."
       })
       .option('throttleMS', {
