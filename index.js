@@ -81,7 +81,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('throttleMS', {
 	type: 'number',
-	default: 150,
+	default: 50,
 	description: "Number of milliseconds to pause between publish actions."
       })
       .option('dryRun', {
@@ -101,16 +101,23 @@ function log(...rest) { // If info, log args (with newline at end).
 function blankLine() { // If info, log a blank line.
   if (info) console.log();
 }
+function tick() { // If info, output a dot, without a new line
+  if (info) process.stdout.write('.');
+}
 function debug(...rest) { // If info, log args (with newline at end).
   if (!verbose) return;
   console.log(...rest);
 }
 function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePublishS} seconds before publishing.`
   // Tagged template function that logs the interpolated string and pauses the first value amount of seconds.
+  // The returned promise also has a cancel() method that will cancel the timeout.
   const zipped = strings.map((k, i) => [k, values[i] ?? '']).flat();
   const ms = values[0] * 1e3;
   log(zipped.join(''));
-  return P2PWebNetwork.delay(ms);
+  let timer;
+  let delay = new Promise(resolve => timer = setTimeout(resolve, ms));
+  delay.cancel = () => clearInterval(timer);
+  return delay;
 }
 
 const url = new URL('/', baseURL)
@@ -154,6 +161,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
       if (!dryRun) {
 	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
 	for (const msgId of subject) {
+	  tick();
 	  await network.publish({eventName, region, owner, subject:msgId, signWith});
 	  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
 	}
@@ -161,6 +169,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
       totalKilled++;
     }
     if (!dryRun) rm('killCache.txt');
+    blankLine();
   }
 }
 
@@ -317,10 +326,12 @@ if (!dryRun && subTimeoutS) {
   // Wait for everyone to report.
   // Report any incorrect results.
   const start = Date.now();
+  let delay;
   const success = await Promise.race([
     Promise.all(receivedAll),
-    pause`Waiting up to ${subTimeoutS} seconds for subscriptions to fire.`
+    delay = pause`Waiting up to ${subTimeoutS} seconds for subscriptions to fire.`
   ]);
+  delay.cancel(); // Do not leave timeout going after we get a successful response.
   if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
   else log("FAILED to receive all events.");
   for (const topicString in topics) {
