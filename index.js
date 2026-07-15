@@ -10,7 +10,7 @@ import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
 
 const start = Date.now();
-process.title = 'alert-bot'; // Handy for debugging when you have lots of nodejs processes.
+process.title = 'axona-alert-bot'; // Handy for debugging when you have lots of nodejs processes.
 const extendedStyles = radioStyles.concat(demoStyles);
 const extendedMap = {}
 extendedStyles.forEach(extended => extendedMap[canonicalTag(extended)] = extended);
