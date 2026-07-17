@@ -1,11 +1,10 @@
 {
   "name": "alert-bot",
-  "version": "0.0.3",
-  "description": "Adds data to the DHT.",
+  "version": "1.2.0",
+  "description": "Adds data to civildefense.io.",
   "scripts": {
-    "local": "node ./index.js --externalBaseURL http://localhost:3000/kdht/",
-    "ki1r0y": "node ./index.js --externalBaseURL https://ki1r0y.com/kdht/",
-    "civildefense": "node ./index.js --externalBaseURL https://civildefense.io/kdht/"
+    "start": "node ./index.js",
+    "cacheRadioStations": "node stationData.js"
   },
   "exports": {
     ".": "./index.js"
@@ -21,10 +20,9 @@
   "author": "howard.stearns@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "@yz-social/kdht": "^0.1.49",
+    "@yz-social/civildefense.io": "^4.5.5",
     "image-to-uri": "^1.0.0",
     "s2js": "^1.44.0",
-    "uuid": "^13.0.0",
     "yargs": "^18.0.0"
   }
 }

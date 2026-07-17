@@ -1,22 +1,27 @@
 #!/usr/bin/env node
 import process from 'node:process';
+import { readdir, open, rm, appendFile } from 'node:fs/promises';
+import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { v4 as uuidv4 } from 'uuid';
-import { getContainingCells } from './s2.js';
-import { demoData, users } from './demo-data.js';
-import { NetworkClass } from './network.js'; // Temporary hack. See file.
+import { demoData, users, styles as demoStyles } from './demo-data.js';
+import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location } from '@yz-social/civildefense.io';
+import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
 
-process.title = 'alert-bot'; // Handy for debugging when you have lots of nodejs processes.
+const start = Date.now();
+process.title = 'axona-alert-bot'; // Handy for debugging when you have lots of nodejs processes.
+const extendedStyles = radioStyles.concat(demoStyles);
+const extendedMap = {}
+extendedStyles.forEach(extended => extendedMap[canonicalTag(extended)] = extended);
 
 // Command-line args. Here we use the yargs package to parse.
 const argv = yargs(hideBin(process.argv))
       .usage(`Publish CivilDefense.io alerts.`)
-      .option('externalBaseURL', {
+      .option('baseURL', {
 	type: 'string',
-	default: 'http://localhost:3000/kdht/',
-	description: "The base URL of the some other portal server to which we should connect ours, if any."
+	default: 'https://civildefense.io/',
+	description: "The base URL where the results can be reached."
       })
       .option('info', {
 	alias: 'i',
@@ -28,86 +33,334 @@ const argv = yargs(hideBin(process.argv))
 	alias: 'v',
 	type: 'boolean',
 	default: false,
-	description: "Run with verbose logging."
+	description: "Run with extra debug logging."
       })
-      .option('dht', {
+      .option('tags', {
+	type: 'string', array: true,
+	default: radioStyles.map(canonicalTag).concat('fire', 'ice', 'flood', 'help', 'cake'),
+	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
+      })
+      .option('regions', {
+	type: 'array', string: true,
+	description: "Restrict publication to these hex-code regions. (Empty means no restriction.)"
+      })
+      .option('kill', {
+	type: 'boolean',
+	default: true,
+	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
+      })
+      .option('pauseBeforeDeleteS', {
 	type: 'number',
-	default: 1,
-	description: "Temporary hack option to use the alternative pub/sub if the value is 0."
+	default: 0,
+	description: "Number of seconds to wait between joining and deleting."
       })
+      .option('pauseBeforePublishS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait after joining-or-deleting, before we start to publish."
+      })
+      .option('pauseAfterPublishS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait after all publications, before disconnecting."
+      })
+      .option('pauseBeforeRestartS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait between disconnecting and re-joining for confirmation."
+      })
+      .option('pauseBeforeSubscribeS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait between re-joining and subscribing."
+      })
+      .option('subTimeoutS', {
+	type: 'number',
+	default: 30,
+	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
+      })
+      .option('throttleMS', {
+	type: 'number',
+	default: 50,
+	description: "Number of milliseconds to pause between publish actions."
+      })
+      .option('dryRun', {
+	type: 'boolean',
+	default: false,
+	description: "Skip actual publication."
+      })
+      .option('includeImages', {
+	type: 'boolean',
+	default: true,
+	description: "Include any image attachments that may be in the data."
+      })
+      .strict()
       .parse();
 
-const {externalBaseURL, info, verbose} = argv; // yargs puts values in argv.
-if (info) console.log({externalBaseURL, network: NetworkClass.name});
-await NetworkClass.configure(externalBaseURL);
+let {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 
-// Create a p2p node and connect to the YZ network through externalBaseURL.
-// For more information, see https://github.com/YZ-social/kdht?tab=readme-ov-file#kdht, which is the p2p network used by Civil Defense.
-const contact = await NetworkClass.create({info, debug: verbose});
-await contact.connect(externalBaseURL);
-
-// Publish the handle/avatar for each reporting user.
-for (const {tag, handle, avatar} of Object.values(users)) {
-  if (handle) await contact.publish({ eventName: `public:${tag}`, subject: 'handle', payload: handle });
-  if (avatar) await contact.publish({ eventName: `public:${tag}`, subject: 'avatar', payload: imageToUri(`./images/${avatar}`) });  
+function log(...rest) { // If info, log args (with newline at end).
+  if (!info) return;
+  console.log(new Date().toLocaleTimeString(), ...rest);
+}
+function blankLine() { // If info, log a blank line.
+  if (info) console.log();
+}
+function tick() { // If info, output a dot, without a new line
+  if (info) process.stdout.write('.');
+}
+function debug(...rest) { // If info, log args (with newline at end).
+  if (!verbose) return;
+  console.log(...rest);
+}
+function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePublishS} seconds before publishing.`
+  // Tagged template function that logs the interpolated string and pauses the first value amount of seconds.
+  // The returned promise also has a cancel() method that will cancel the timeout.
+  const zipped = strings.map((k, i) => [k, values[i] ?? '']).flat();
+  const ms = values[0] * 1e3;
+  log(zipped.join(''));
+  let timer;
+  let delay = new Promise(resolve => timer = setTimeout(resolve, ms));
+  delay.cancel = () => clearInterval(timer);
+  return delay;
 }
 
+const url = new URL('/', baseURL)
+const params = url.searchParams;
+function makeURL({subject, lat, lng, tag}) {
+  params.set('lat', lat);
+  params.set('lng', lng);
+  params.set('alert', subject);
+  params.set('tags', encodeURIComponent(tag));
+  return url.href;
+}
+function create() {
+  return P2PWebNetwork.create({region: regions?.length ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
+}
 
-// Post to CivilDefense.io (local network or shared, depending on the externaBaseURL used by the contact).
-async function publishEvent({lat, lng, // location on the globe
-			     eventTime, // Javscript timestamp
-			     source, // Name string of source. Please use a different one for each data source.
-			     // (Later this will involve signing by a public key. https://github.com/kilroy-code/distributed-security
+// Create a p2p node and connect to the YZ network.
+let network = await create();
+
+async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
+  let user = users[source];
+  // A truthy user.identity is used in signWith, and also indicates that it was used this run.
+  user.identity ||= await P2PWebNetwork.createAuthorIdentity({persistAs: source, store: {
+    set(key, value) { /* noop */ },
+    get(key) { return user.dump; }
+  }});
+  if (!region) return user.identity;
+  const regions = (user.regions ||= []);
+  if (!regions.includes(region)) regions.push(region);
+  return user.identity
+}
+
+let totalKilled = 0;
+if (kill) { // Delete everything that had been recorded in killCache.txt in previous runs, and then delete the file.
+  const file = await open('killCache.txt').catch(error => (error.code !== 'ENOENT') && console.error(error));
+  if (file) {
+    await pause`Waiting ${pauseBeforeDeleteS} seconds before deleting previous run's publications.`;
+    for await (const line of file.readLines()) {
+      let {eventName, region, owner, subject, source} = JSON.parse(line);
+      const signWith = await getUserIdentity(source);
+      debug('kill', eventName, region, subject, signWith.authorId);
+      if (!dryRun) {
+	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
+	for (const msgId of subject) {
+	  tick();
+	  await network.publish({eventName, region, owner, subject:msgId, signWith});
+	  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
+	}
+      }
+      totalKilled++;
+    }
+    if (!dryRun) rm('killCache.txt');
+    blankLine();
+  }
+}
+
+function recordForKill({eventName, region, owner, subject, source}) { // Asynchronously add to Record in killCache.txt.
+  return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, subject, source}) + EOL, 'utf8');
+}
+let totalPublications = 0;
+const topics = {}; // Map topic JSON string => {nPublished, isChunk, run1: {nReceivedKill, nReceivedPub}, run2: same}
+function countTopic(topic, subject) {
+  const topicKey = JSON.stringify(topic);
+  const isChunk = Array.isArray(subject);
+  topics[topicKey] ??= {nPublished: 0, isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
+  topics[topicKey].nPublished += 1;
+  totalPublications += isChunk ? subject.length : 1;
+}
+function record({eventName, region, owner, subject, source}) { // Asynchronously recordForKill and countTopic
+  countTopic({name: eventName, region, owner}, subject);
+  return recordForKill({eventName, region, owner, subject, source});
+}
+
+async function publish({eventName, region, owner, source, ...options}) { // Publish to network.
+  const signWith = await getUserIdentity(source, region);
+  const subject = dryRun ? Date.now() : await network.publish({eventName, region, owner, ...options, signWith});
+  debug('publish', eventName, region, source, signWith.authorId, subject);
+  await record({eventName, region, owner, subject, source});
+  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
+  return subject;
+}
+
+// Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
+let totalAlerts = 0;
+async function publishAlert({lat, lng, // location on the globe
+			     eventTime = Date.now(), // Javscript timestamp
+			     source = 'alert-bot', // Identifier key in users dictionary. (Not the handle.)
 			     replies = [], // Additional information, if any.
 			     topicWithDefaultIcon, // Hashtag with a leading emoji used as an icon on the map.
-			     topicKey = topicWithDefaultIcon.replace(/^\p{Emoji}*\uFE0F?\s*/u, '') // Stripping off any leading emoji.
+			     topicKey = canonicalTag(topicWithDefaultIcon) // Stripping off any leading emoji.
 			    }) {
+  if (!tags.includes(topicKey)) return;
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
-  const sourceTag = users[source].tag;
-
+ 
   // First we publish the "alert" - which will appear as an icon on the map.  
   // If the user opens it, it has a timestamp and an identicon for the source string.
   // To do this, we actually publish to a series of different eventNames based on map position. See s2.js.
+  const region = P2PWebNetwork.regionCode(lat, lng);
   const cells = getContainingCells(lat, lng);
-  const alertIdentifier = uuidv4(); // A unique identifier for this alert, which people will reply to.
   const payload = {lat, lng};
-  //console.log(source, lat, lng, topicWithDefaultIcon);
+  let alertIdentifier;
   for (const cell of cells) {
-    const eventName = `s2:${cell}:${topicKey}`;
-    await contact.publish({eventName, subject: alertIdentifier, payload, hashtag: topicWithDefaultIcon, act: sourceTag, issuedTime: eventTime});
+    const eventName = alertTopic(cell, topicKey);
+    const msgId = await publish({eventName, region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source});
+    alertIdentifier = msgId;
   }
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
-    //console.log('reply', reply);
-    const replyIdentifier = uuidv4(); // A unique identifier for this reply.
-    let payload = reply, replySource = sourceTag;
+    let payload = reply, replySource = source;
     if (reply.message) { // Each reply can be a string or an object with message and optional user and filename.
       const {message, user = source, filename} = reply;
+      replySource = user;
       payload = {message};
-      replySource = users[user].tag;
-      if (filename) {
-	payload.file = imageToUri(`./images/${filename}`);
+      if (filename && includeImages) {
+	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
+	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
+	const signWith = await getUserIdentity(source, region);
+	const {topic:file, msgIds} = await network.chunkifyBlob({blob, region, signWith, maxDimension: 0});
+	debug('publish chunk', file, msgIds.length, 'chunks.');
+	totalPublications += msgIds.length;
+	payload.file = file;
+	countTopic(file, msgIds);
+	const {name, owner} = file;
+	await record({eventName:name, region, owner, subject: msgIds, source});
 	payload.name = filename;
+	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
       }
     }
-    await contact.publish({eventName: alertIdentifier, subject: replyIdentifier, payload, act: replySource});
+    eventTime += 1e3;
+    await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, source: replySource});
   }
-  return alertIdentifier;
+  totalAlerts++;
+  if (!info) return;
+  log(makeURL({subject: alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
 
-const url = new URL('/', externalBaseURL)
-const params = url.searchParams
-  
-// Post each datum in demoData.
+await pause`Waiting ${pauseBeforePublishS} seconds before publishing.`;
+blankLine();
+
+for (const code of await readdir(streamingRootPath)) {
+  if (regions && !regions.includes(code)) continue;
+  const codeDir = `${streamingRootPath}/${code}`;
+  for (const styleFileName of await readdir(codeDir)) {
+    const style = styleFileName.slice(0, -'.json'.length);
+    const canonical = canonicalTag(style)
+    if (!tags.includes(canonical)) continue; // optimization
+    const extended = extendedMap[canonical];
+    const path = `${codeDir}/${styleFileName}`;
+    const dataModule = await import(path, {with: { type: 'json' }})
+	  .catch(_ => {return {default: []};}); // Not all styles are present.
+    for (const station of dataModule.default) {
+      const {lat, lng, name, url, mime, homepage} = station;
+      const title = new URL(homepage).host.replace(/^www\./, '');
+      const subject = await publishAlert({lat, lng, topicWithDefaultIcon: extended, replies: [
+	{message: `${title}: ${name} ${homepage} ${url}`}
+      ]});
+    }
+  }
+}
+
+// Post each datum.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
-  const subject = await publishEvent({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
-  params.set('lat', lat);
-  params.set('lng', lng);
-  params.set('sub', subject);
-  params.set('tags', encodeURIComponent(tag));
-  console.log(url.href);
+  const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
+  if (regions && !regions.includes(region)) continue;
+  await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
 }
 
-if (info) console.log('published');
-await new Promise(resolve => setTimeout(resolve, 5e3));
-await contact.disconnect(true);
-if (info) console.log('done! winding down');
+// Publish the handle/avatar for each reporting user.
+for (const key of Object.keys(users)) {
+  const {handle, avatar, identity, regions = []} = users[key];
+  const issuedTime = Date.now();
+  for (const region of regions) {
+    const owner = identity.authorId;
+    if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
+    if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
+  }
+}
+
+
+blankLine();
+log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
+await pause`Waiting ${pauseAfterPublishS} seconds before disconnecting the publishing node.`;
+console.log('roots:', network.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
+await network.disconnect();
+
+if (!dryRun && subTimeoutS) {
+  async function check(key) {
+    blankLine();
+    await pause`${key}: Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery.`;
+    // Subscribe to everything in parallel.
+    network = await create();
+    await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
+    const topicStrings = Object.keys(topics);
+    log(`Subscribing to ${topicStrings.length} topics.`);
+    const receivedAll = [];
+    await Promise.all(topicStrings.map(topicString => {
+      const {name, region, owner} = JSON.parse(topicString);
+      const topicData = topics[topicString];
+      const {promise, resolve} = Promise.withResolvers();
+      const handler = ({deleted}) => {
+	if (deleted) topicData[key].nReceivedKill++;
+	else topicData[key].nReceivedPub++;
+	debug(key, deleted ? 'deleted' : 'received', topicString, topicData);
+	if (topicData[key].nReceivedPub >= topicData.nPublished) resolve();
+      };
+      receivedAll.push(promise);
+      return topicData.isChunk ?
+	network.assembleChunkedDataURL({name, region, owner}).then(handler) :
+	network.subscribe({eventName: name, region, owner, handler});
+    }));
+    // Wait for everyone to report.
+    // Report any incorrect results.
+    const start = Date.now();
+    let delay;
+    const success = await Promise.race([
+      Promise.all(receivedAll),
+      delay = pause`Waiting up to ${subTimeoutS} seconds for subscriptions to fire.`
+    ]);
+    delay.cancel(); // Do not leave timeout going after we get a successful response.
+    if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
+    else log("FAILED to receive all events.");
+    console.log('roots:', network.peer.health().axonRoles.filter(r => r.isRoot));
+    await network.disconnect();
+  }
+  await check('run1');
+  subTimeoutS *= 2;
+  await check('run2');
+  blankLine();
+  let nPubFails = 0, nKillFails = 0;
+  for (const topicString in topics) {
+    const {nPublished, run1, run2} = topics[topicString];
+    if (nPublished !== run1.nReceivedPub || nPublished !== run2.nReceivedPub) {
+      nPubFails++;
+      log(`Topic ${topicString} published ${nPublished} but received ${run1.nReceivedPub} and ${run2.nReceivedPub} events!`);
+    } else if (run1.nReceivedKill || run2.nReceivedKill) {
+      nKillFails++;
+      log(`Topic ${topicString} received ${runl1.nReceivedKill} and ${runl2.nReceivedKill} events!`);
+    } // else log(`(Topic ${topicString} published ${nPublished} and succesfully received ${run1.nReceivedPub}/${run2.nReceivedPub} events.)`);
+  }
+  blankLine();
+  log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events, from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
+}
+log('Done.');
