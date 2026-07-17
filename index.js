@@ -76,8 +76,8 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('subTimeoutS', {
 	type: 'number',
-	default: 65,
-	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received."
+	default: 30,
+	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
       })
       .option('throttleMS', {
 	type: 'number',
@@ -89,10 +89,15 @@ const argv = yargs(hideBin(process.argv))
 	default: false,
 	description: "Skip actual publication."
       })
+      .option('includeImages', {
+	type: 'boolean',
+	default: true,
+	description: "Include any image attachments that may be in the data."
+      })
       .strict()
       .parse();
 
-const {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
@@ -125,7 +130,7 @@ const params = url.searchParams;
 function makeURL({subject, lat, lng, tag}) {
   params.set('lat', lat);
   params.set('lng', lng);
-  params.set('sub', subject);
+  params.set('alert', subject);
   params.set('tags', encodeURIComponent(tag));
   return url.href;
 }
@@ -177,11 +182,11 @@ function recordForKill({eventName, region, owner, subject, source}) { // Asynchr
   return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, subject, source}) + EOL, 'utf8');
 }
 let totalPublications = 0;
-const topics = {}; // Map topic JSON string => {nPublished, isChunk, nReceived};
+const topics = {}; // Map topic JSON string => {nPublished, isChunk, run1: {nReceivedKill, nReceivedPub}, run2: same}
 function countTopic(topic, subject) {
   const topicKey = JSON.stringify(topic);
   const isChunk = Array.isArray(subject);
-  topics[topicKey] ??= {nPublished: 0, isChunk, nReceived: 0};
+  topics[topicKey] ??= {nPublished: 0, isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
   topics[topicKey].nPublished += 1;
   totalPublications += isChunk ? subject.length : 1;
 }
@@ -229,7 +234,7 @@ async function publishAlert({lat, lng, // location on the globe
       const {message, user = source, filename} = reply;
       replySource = user;
       payload = {message};
-      if (filename) {
+      if (filename && includeImages) {
 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
 	const signWith = await getUserIdentity(source, region);
@@ -237,7 +242,7 @@ async function publishAlert({lat, lng, // location on the globe
 	debug('publish chunk', file, msgIds.length, 'chunks.');
 	totalPublications += msgIds.length;
 	payload.file = file;
-	countTopic(file);
+	countTopic(file, msgIds);
 	const {name, owner} = file;
 	await record({eventName:name, region, owner, subject: msgIds, source});
 	payload.name = filename;
@@ -290,55 +295,72 @@ for (const key of Object.keys(users)) {
   for (const region of regions) {
     const owner = identity.authorId;
     if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
-    if (avatar) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
+    if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
   }
 }
 
 
 blankLine();
-log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
+log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
 await pause`Waiting ${pauseAfterPublishS} seconds before disconnecting the publishing node.`;
+console.log('roots:', network.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
 await network.disconnect();
 
 if (!dryRun && subTimeoutS) {
-  blankLine();
-  await pause`Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery.`;
-  // Subscribe to everything in parallel.
-  network = await create();
-  await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
-  const topicStrings = Object.keys(topics);
-  log(`Subscribing to ${topicStrings.length} topics.`);
-  const receivedAll = [];
-  await Promise.all(topicStrings.map(topicString => {
-    const {name, region, owner} = JSON.parse(topicString);
-    const topicData = topics[topicString];
-    const {promise, resolve} = Promise.withResolvers();
-    const handler = ({deleted}) => {
-      topicData.nReceived++;
-      debug(deleted ? 'deleted' : 'received', topicString);
-      if (topicData.nReceived >= topicData.nPublished) resolve();
-    };
-    receivedAll.push(promise);
-    return topicData.isChunk ?
-      network.assembleChunkedDataURL({name, region, owner}) :
-      network.subscribe({eventName: name, region, owner, handler});
-  }));
-  // Wait for everyone to report.
-  // Report any incorrect results.
-  const start = Date.now();
-  let delay;
-  const success = await Promise.race([
-    Promise.all(receivedAll),
-    delay = pause`Waiting up to ${subTimeoutS} seconds for subscriptions to fire.`
-  ]);
-  delay.cancel(); // Do not leave timeout going after we get a successful response.
-  if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
-  else log("FAILED to receive all events.");
-  for (const topicString in topics) {
-    const {nPublished, nReceived} = topics[topicString];
-    if (nPublished === nReceived) continue;
-    log(`Topic ${topicString} published ${nPublished} but received ${nReceived}!`);
+  async function check(key) {
+    blankLine();
+    await pause`${key}: Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery.`;
+    // Subscribe to everything in parallel.
+    network = await create();
+    await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
+    const topicStrings = Object.keys(topics);
+    log(`Subscribing to ${topicStrings.length} topics.`);
+    const receivedAll = [];
+    await Promise.all(topicStrings.map(topicString => {
+      const {name, region, owner} = JSON.parse(topicString);
+      const topicData = topics[topicString];
+      const {promise, resolve} = Promise.withResolvers();
+      const handler = ({deleted}) => {
+	if (deleted) topicData[key].nReceivedKill++;
+	else topicData[key].nReceivedPub++;
+	debug(key, deleted ? 'deleted' : 'received', topicString, topicData);
+	if (topicData[key].nReceivedPub >= topicData.nPublished) resolve();
+      };
+      receivedAll.push(promise);
+      return topicData.isChunk ?
+	network.assembleChunkedDataURL({name, region, owner}).then(handler) :
+	network.subscribe({eventName: name, region, owner, handler});
+    }));
+    // Wait for everyone to report.
+    // Report any incorrect results.
+    const start = Date.now();
+    let delay;
+    const success = await Promise.race([
+      Promise.all(receivedAll),
+      delay = pause`Waiting up to ${subTimeoutS} seconds for subscriptions to fire.`
+    ]);
+    delay.cancel(); // Do not leave timeout going after we get a successful response.
+    if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
+    else log("FAILED to receive all events.");
+    console.log('roots:', network.peer.health().axonRoles.filter(r => r.isRoot));
+    await network.disconnect();
   }
-  await network.disconnect();
+  await check('run1');
+  subTimeoutS *= 2;
+  await check('run2');
+  blankLine();
+  let nPubFails = 0, nKillFails = 0;
+  for (const topicString in topics) {
+    const {nPublished, run1, run2} = topics[topicString];
+    if (nPublished !== run1.nReceivedPub || nPublished !== run2.nReceivedPub) {
+      nPubFails++;
+      log(`Topic ${topicString} published ${nPublished} but received ${run1.nReceivedPub} and ${run2.nReceivedPub} events!`);
+    } else if (run1.nReceivedKill || run2.nReceivedKill) {
+      nKillFails++;
+      log(`Topic ${topicString} received ${runl1.nReceivedKill} and ${runl2.nReceivedKill} events!`);
+    } // else log(`(Topic ${topicString} published ${nPublished} and succesfully received ${run1.nReceivedPub}/${run2.nReceivedPub} events.)`);
+  }
+  blankLine();
+  log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events, from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
 }
 log('Done.');
