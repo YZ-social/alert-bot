@@ -309,7 +309,7 @@ await network.disconnect();
 if (!dryRun && subTimeoutS) {
   async function check(key) {
     blankLine();
-    await pause`${key}: Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery.`;
+    await pause`Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery for ${key}.`;
     // Subscribe to everything in parallel.
     network = await create();
     await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
@@ -349,18 +349,20 @@ if (!dryRun && subTimeoutS) {
   subTimeoutS *= 2;
   await check('run2');
   blankLine();
-  let nPubFails = 0, nKillFails = 0;
+  let nPubFails = 0, nKillFails = 0, nDeviations = 0;
   for (const topicString in topics) {
     const {nPublished, run1, run2} = topics[topicString];
     if (nPublished !== run1.nReceivedPub || nPublished !== run2.nReceivedPub) {
       nPubFails++;
+      if (run1.nReceivedPub !== run2.nReceivedPub) nDeviations++;
       log(`Topic ${topicString} published ${nPublished} but received ${run1.nReceivedPub} and ${run2.nReceivedPub} events!`);
     } else if (run1.nReceivedKill || run2.nReceivedKill) {
       nKillFails++;
+      if (run1.nReceivedKill !== run2.nReceivedKill) nDeviations++;
       log(`Topic ${topicString} received ${runl1.nReceivedKill} and ${runl2.nReceivedKill} events!`);
     } // else log(`(Topic ${topicString} published ${nPublished} and succesfully received ${run1.nReceivedPub}/${run2.nReceivedPub} events.)`);
   }
   blankLine();
-  log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events, from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
+  log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events (of which ${nDeviations} failures are different between run1 and run2), from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
 }
 log('Done.');
