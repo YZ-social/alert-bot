@@ -135,7 +135,7 @@ function makeURL({subject, lat, lng, tag}) {
   return url.href;
 }
 function create() {
-  return P2PWebNetwork.create({region: regions?.length ? P2PWebNetwork.regionCenter(parseInt(regions[0], 16)) : location, infoLogger: log});
+  return P2PWebNetwork.create({region: location, infoLogger: log});
 }
 
 // Create a p2p node and connect to the YZ network.
