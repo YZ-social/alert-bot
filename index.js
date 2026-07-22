@@ -84,6 +84,11 @@ const argv = yargs(hideBin(process.argv))
 	default: 50,
 	description: "Number of milliseconds to pause between publish actions."
       })
+      .option('subStaggerMs', {
+	type: 'number',
+	default: 0,
+	description: "Milliseconds to wait between each topic subscription. 0 (default) subscribes to all topics at once (a burst); a positive value spreads them out, closer to how real subscribers arrive and a fairer test of the system under load."
+      })
       .option('dryRun', {
 	type: 'boolean',
 	default: false,
@@ -97,7 +102,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, tags, regions, kill, throttleMS, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
@@ -314,9 +319,9 @@ if (!dryRun && subTimeoutS) {
     network = await create();
     await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
     const topicStrings = Object.keys(topics);
-    log(`Subscribing to ${topicStrings.length} topics.`);
+    log(`Subscribing to ${topicStrings.length} topics${subStaggerMs ? ` (staggered ${subStaggerMs}ms apart)` : ''}.`);
     const receivedAll = [];
-    await Promise.all(topicStrings.map(topicString => {
+    const startSub = topicString => {
       const {name, region, owner} = JSON.parse(topicString);
       const topicData = topics[topicString];
       const {promise, resolve} = Promise.withResolvers();
@@ -330,7 +335,15 @@ if (!dryRun && subTimeoutS) {
       return topicData.isChunk ?
 	network.assembleChunkedDataURL({name, region, owner}).then(handler) :
 	network.subscribe({eventName: name, region, owner, handler});
-    }));
+    };
+    if (subStaggerMs) {                       // spread subscribes out — a fairer, more realistic test
+      for (const topicString of topicStrings) {
+	await startSub(topicString);
+	await P2PWebNetwork.delay(subStaggerMs);
+      }
+    } else {                                  // default: all at once (a burst)
+      await Promise.all(topicStrings.map(startSub));
+    }
     // Wait for everyone to report.
     // Report any incorrect results.
     const start = Date.now();
