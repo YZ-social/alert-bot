@@ -196,12 +196,13 @@ const topics = {}; // Map topic JSON string => {nPublished, isChunk, run1: {nRec
 function countTopic(topic, subject) {
   const topicKey = JSON.stringify(topic);
   const isChunk = Array.isArray(subject);
-  topics[topicKey] ??= {nPublished: 0, isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
+  topics[topicKey] ??= {nPublished: 0, isChunk, metrics: [], run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
   topics[topicKey].nPublished += 1;
   totalPublications += isChunk ? subject.length : 1;
+  if (verbose || subTimeoutS) networkPublisher.peer.metrics(topic).then(metrics => topics[topicKey].metrics.push(metrics));
 }
-function record({eventName, region, owner, subject, source}) { // Asynchronously recordForKill and countTopic
-  countTopic({name: eventName, region, owner}, subject);
+function record({eventName, region, owner, subject, source}, msgIds) { // Asynchronously recordForKill and countTopic
+  countTopic({name: eventName, region, owner}, msgIds || subject);
   return recordForKill({eventName, region, owner, subject, source});
 }
 
@@ -252,7 +253,7 @@ async function publishAlert({lat, lng, // location on the globe
 	debug('publish chunk', file, msgIds.length, 'chunks.');
 	totalPublications += msgIds.length;
 	payload.file = file;
-	countTopic(file, msgIds);
+	await record(file, msgIds);
 	const {name, owner} = file;
 	await record({eventName:name, region, owner, subject: msgIds, source});
 	payload.name = filename;
@@ -361,6 +362,11 @@ if (!dryRun && subTimeoutS) {
     if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
     else log("FAILED to receive all events.");
     console.log('roots:', networkSubscriber.peer.health().axonRoles.filter(r => r.isRoot));
+    for (const topicString in topics) {
+      const data = topics[topicString];
+      if (data[key].nReceivedPub === data.nPublished) continue;
+      if (verbose || subTimeoutS) data.metrics.push(await networkSubscriber.peer.metrics(JSON.parse(topicString)));
+    }
     await networkSubscriber.disconnect();
   }
   await check('run1');
@@ -369,17 +375,23 @@ if (!dryRun && subTimeoutS) {
   blankLine();
   if (!disconnectAfterPublish) await networkPublisher.disconnect();
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
+  let oneShotFired = false;
   for (const topicString in topics) {
-    const {nPublished, run1, run2} = topics[topicString];
+    const {nPublished, run1, run2, metrics} = topics[topicString];
     if (nPublished !== run1.nReceivedPub || nPublished !== run2.nReceivedPub) {
       nPubFails++;
       if (run1.nReceivedPub !== run2.nReceivedPub) nDeviations++;
       log(`Topic ${topicString} published ${nPublished} but received ${run1.nReceivedPub} and ${run2.nReceivedPub} events!`);
+      log(`metrics following each of the ${nPublished} publications and two confirmations:`, ...metrics);
     } else if (run1.nReceivedKill || run2.nReceivedKill) {
       nKillFails++;
       if (run1.nReceivedKill !== run2.nReceivedKill) nDeviations++;
       log(`Topic ${topicString} received ${runl1.nReceivedKill} and ${runl2.nReceivedKill} events!`);
-    } // else log(`(Topic ${topicString} published ${nPublished} and succesfully received ${run1.nReceivedPub}/${run2.nReceivedPub} events.)`);
+    } //else log(`(Topic ${topicString} published ${nPublished} and succesfully received ${run1.nReceivedPub}/${run2.nReceivedPub} events.)`);
+    else if (!oneShotFired) {
+      oneShotFired = true;
+      log("For comparison purposes, a good topic looks like:", ...metrics);
+    }
   }
   blankLine();
   log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events (of which ${nDeviations} failures are different between run1 and run2), from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
