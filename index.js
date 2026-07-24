@@ -64,6 +64,11 @@ const argv = yargs(hideBin(process.argv))
 	default: 0,
 	description: "Number of seconds to wait after all publications, before disconnecting."
       })
+      .option('disconnectAfterPublish', {
+	type: 'boolean',
+	default: true,
+	description: "Whether to disconnect the publisher before running confirmations. (Otherwise disconnects at exit.)"
+      })
       .option('pauseBeforeRestartS', {
 	type: 'number',
 	default: 0,
@@ -102,7 +107,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info) return;
@@ -144,7 +149,7 @@ function create() {
 }
 
 // Create a p2p node and connect to the YZ network.
-let network = await create();
+let networkPublisher = await create();
 
 async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
   let user = users[source];
@@ -172,7 +177,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
 	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
 	for (const msgId of subject) {
 	  tick();
-	  await network.publish({eventName, region, owner, subject:msgId, signWith});
+	  await networkPublisher.publish({eventName, region, owner, subject:msgId, signWith});
 	  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
 	}
       }
@@ -202,7 +207,7 @@ function record({eventName, region, owner, subject, source}) { // Asynchronously
 
 async function publish({eventName, region, owner, source, ...options}) { // Publish to network.
   const signWith = await getUserIdentity(source, region);
-  const subject = dryRun ? Date.now() : await network.publish({eventName, region, owner, ...options, signWith});
+  const subject = dryRun ? Date.now() : await networkPublisher.publish({eventName, region, owner, ...options, signWith});
   debug('publish', eventName, region, source, signWith.authorId, subject);
   await record({eventName, region, owner, subject, source});
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
@@ -243,7 +248,7 @@ async function publishAlert({lat, lng, // location on the globe
 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
 	const signWith = await getUserIdentity(source, region);
-	const {topic:file, msgIds} = await network.chunkifyBlob({blob, region, signWith, maxDimension: 0});
+	const {topic:file, msgIds} = await networkPublisher.chunkifyBlob({blob, region, signWith, maxDimension: 0});
 	debug('publish chunk', file, msgIds.length, 'chunks.');
 	totalPublications += msgIds.length;
 	payload.file = file;
@@ -307,16 +312,16 @@ for (const key of Object.keys(users)) {
 
 blankLine();
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
-await pause`Waiting ${pauseAfterPublishS} seconds before disconnecting the publishing node.`;
-console.log('roots:', network.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
-await network.disconnect();
+await pause`Waiting ${pauseAfterPublishS} seconds before ${disconnectAfterPublish ? 'disconnecting the publishing node' : 'proceeding'}.`;
+console.log('roots:', networkPublisher.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
+if (disconnectAfterPublish) await networkPublisher.disconnect();
 
 if (!dryRun && subTimeoutS) {
   async function check(key) {
     blankLine();
     await pause`Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery for ${key}.`;
     // Subscribe to everything in parallel.
-    network = await create();
+    const networkSubscriber = await create();
     await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
     const topicStrings = Object.keys(topics);
     log(`Subscribing to ${topicStrings.length} topics${subStaggerMs ? ` (staggered ${subStaggerMs}ms apart)` : ''}.`);
@@ -333,8 +338,8 @@ if (!dryRun && subTimeoutS) {
       };
       receivedAll.push(promise);
       return topicData.isChunk ?
-	network.assembleChunkedDataURL({name, region, owner}).then(handler) :
-	network.subscribe({eventName: name, region, owner, handler});
+	networkSubscriber.assembleChunkedDataURL({name, region, owner}).then(handler) :
+	networkSubscriber.subscribe({eventName: name, region, owner, handler});
     };
     if (subStaggerMs) {                       // spread subscribes out — a fairer, more realistic test
       for (const topicString of topicStrings) {
@@ -355,13 +360,14 @@ if (!dryRun && subTimeoutS) {
     delay.cancel(); // Do not leave timeout going after we get a successful response.
     if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
     else log("FAILED to receive all events.");
-    console.log('roots:', network.peer.health().axonRoles.filter(r => r.isRoot));
-    await network.disconnect();
+    console.log('roots:', networkSubscriber.peer.health().axonRoles.filter(r => r.isRoot));
+    await networkSubscriber.disconnect();
   }
   await check('run1');
   subTimeoutS *= 2;
   await check('run2');
   blankLine();
+  if (!disconnectAfterPublish) await networkPublisher.disconnect();
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
   for (const topicString in topics) {
     const {nPublished, run1, run2} = topics[topicString];
