@@ -62,12 +62,17 @@ const argv = yargs(hideBin(process.argv))
       .option('pauseAfterPublishS', {
 	type: 'number',
 	default: 0,
-	description: "Number of seconds to wait after all publications, before disconnecting."
+	description: "Number of seconds to wait after all publications, before disconnecting or proceeding."
       })
       .option('disconnectAfterPublish', {
 	type: 'boolean',
 	default: true,
 	description: "Whether to disconnect the publisher before running confirmations. (Otherwise disconnects at exit.)"
+      })
+      .option('metricsS', {
+	type: 'number',
+	default: 5,
+	description: "Number of seconds to wait after first publish to a topic before requesting its metrics. A value of 0 does not collect metrics at all. Forces a pauseAfterPublishS of at least this time."
       })
       .option('pauseBeforeRestartS', {
 	type: 'number',
@@ -107,10 +112,11 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 
 function log(...rest) { // If info, log args (with newline at end).
-  if (!info) return;
+  if (!info && !debug) return;
   console.log(new Date().toLocaleTimeString(), ...rest);
 }
 function blankLine() { // If info, log a blank line.
@@ -121,7 +127,7 @@ function tick() { // If info, output a dot, without a new line
 }
 function debug(...rest) { // If info, log args (with newline at end).
   if (!verbose) return;
-  console.log(...rest);
+  log(...rest);
 }
 function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePublishS} seconds before publishing.`
   // Tagged template function that logs the interpolated string and pauses the first value amount of seconds.
@@ -145,7 +151,7 @@ function makeURL({subject, lat, lng, tag}) {
   return url.href;
 }
 function create() {
-  return P2PWebNetwork.create({region: location, infoLogger: log});
+  return P2PWebNetwork.create({region: location, infoLogger: log, debugLogger: debug});
 }
 
 // Create a p2p node and connect to the YZ network.
@@ -192,14 +198,20 @@ function recordForKill({eventName, region, owner, subject, source}) { // Asynchr
   return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, subject, source}) + EOL, 'utf8');
 }
 let totalPublications = 0;
+let reportedSuccess = false;
 const topics = {}; // Map topic JSON string => {nPublished, isChunk, run1: {nReceivedKill, nReceivedPub}, run2: same}
 function countTopic(topic, subject) {
   const topicKey = JSON.stringify(topic);
   const isChunk = Array.isArray(subject);
-  topics[topicKey] ??= {nPublished: 0, isChunk, metrics: [], run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
-  topics[topicKey].nPublished += 1;
+  const data = topics[topicKey] ??= {nPublished: 0, isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
+  data.nPublished += 1;
   totalPublications += isChunk ? subject.length : 1;
-  if (verbose || subTimeoutS) networkPublisher.peer.metrics(topic).then(metrics => topics[topicKey].metrics.push(metrics));
+  if (!metricsS || data.metrics) return;
+  setTimeout(() => data.metrics = networkPublisher.peer.metrics(topic)
+	     .then(metrics => {
+	       debug('metrics for:', topic, metrics);
+	       data.metrics = metrics;
+	     }), metricsS * 1e3);
 }
 function record({eventName, region, owner, subject, source}, msgIds) { // Asynchronously recordForKill and countTopic
   countTopic({name: eventName, region, owner}, msgIds || subject);
@@ -365,7 +377,6 @@ if (!dryRun && subTimeoutS) {
     for (const topicString in topics) {
       const data = topics[topicString];
       if (data[key].nReceivedPub === data.nPublished) continue;
-      if (verbose || subTimeoutS) data.metrics.push(await networkSubscriber.peer.metrics(JSON.parse(topicString)));
     }
     await networkSubscriber.disconnect();
   }
@@ -375,23 +386,18 @@ if (!dryRun && subTimeoutS) {
   blankLine();
   if (!disconnectAfterPublish) await networkPublisher.disconnect();
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
-  let oneShotFired = false;
   for (const topicString in topics) {
     const {nPublished, run1, run2, metrics} = topics[topicString];
     if (nPublished !== run1.nReceivedPub || nPublished !== run2.nReceivedPub) {
       nPubFails++;
       if (run1.nReceivedPub !== run2.nReceivedPub) nDeviations++;
       log(`Topic ${topicString} published ${nPublished} but received ${run1.nReceivedPub} and ${run2.nReceivedPub} events!`);
-      log(`metrics following each of the ${nPublished} publications and two confirmations:`, ...metrics);
+      log(`metrics ${metricsS} seconds after publish:`, metrics);
     } else if (run1.nReceivedKill || run2.nReceivedKill) {
       nKillFails++;
       if (run1.nReceivedKill !== run2.nReceivedKill) nDeviations++;
       log(`Topic ${topicString} received ${runl1.nReceivedKill} and ${runl2.nReceivedKill} events!`);
     } //else log(`(Topic ${topicString} published ${nPublished} and succesfully received ${run1.nReceivedPub}/${run2.nReceivedPub} events.)`);
-    else if (!oneShotFired) {
-      oneShotFired = true;
-      log("For comparison purposes, a good topic looks like:", ...metrics);
-    }
   }
   blankLine();
   log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events (of which ${nDeviations} failures are different between run1 and run2), from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
