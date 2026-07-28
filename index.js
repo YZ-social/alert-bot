@@ -178,7 +178,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
     for await (const line of file.readLines()) {
       let {eventName, region, owner, subject, source} = JSON.parse(line);
       const signWith = await getUserIdentity(source);
-      debug('kill', eventName, region, subject, signWith.authorId);
+      //debug('kill', eventName, region, subject, signWith.authorId);
       if (!dryRun) {
 	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
 	for (const msgId of subject) {
@@ -374,10 +374,6 @@ if (!dryRun && subTimeoutS) {
     if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
     else log("FAILED to receive all events.");
     console.log('roots:', networkSubscriber.peer.health().axonRoles.filter(r => r.isRoot));
-    for (const topicString in topics) {
-      const data = topics[topicString];
-      if (data[key].nReceivedPub === data.nPublished) continue;
-    }
     await networkSubscriber.disconnect();
   }
   await check('run1');
