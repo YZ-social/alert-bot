@@ -73,7 +73,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('metricsS', {
 	type: 'number',
-	default: 5,
+	default: 0,
 	description: "Number of seconds to wait after first publish to a topic before requesting its metrics. A value of 0 does not collect metrics at all. Forces a pauseAfterPublishS of at least this time."
       })
       .option('pauseBeforeRestartS', {
@@ -139,7 +139,7 @@ function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePub
   log(zipped.join(''));
   let timer;
   let delay = new Promise(resolve => timer = setTimeout(resolve, ms));
-  delay.cancel = () => clearInterval(timer);
+  delay.cancel = () => clearTimeout(timer);
   return delay;
 }
 
