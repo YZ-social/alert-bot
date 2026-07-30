@@ -5,7 +5,7 @@ import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { demoData, users, styles as demoStyles } from './demo-data.js';
-import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location } from '@yz-social/civildefense.io';
+import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
 
@@ -37,7 +37,9 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('tags', {
 	type: 'string', array: true,
-	default: radioStyles.map(canonicalTag).concat('fire', 'ice', 'flood', 'help', 'cake'),
+	default: radioStyles.map(canonicalTag).concat('observer corp demo', 'community support demo', 'utility repair demo',
+						      'fire', 'ice', 'flood',
+						      'help', 'cake'),
 	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
       })
       .option('regions', {
@@ -143,10 +145,10 @@ function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePub
 
 const url = new URL('/', baseURL)
 const params = url.searchParams;
-function makeURL({subject, lat, lng, tag}) {
+function makeURL({alertIdentifier, lat, lng, tag}) {
   params.set('lat', lat);
   params.set('lng', lng);
-  params.set('alert', subject);
+  params.set('alert', alertIdentifier);
   params.set('tags', encodeURIComponent(tag));
   return url.href;
 }
@@ -176,14 +178,14 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
   if (file) {
     await pause`Waiting ${pauseBeforeDeleteS} seconds before deleting previous run's publications.`;
     for await (const line of file.readLines()) {
-      let {eventName, region, owner, subject, source} = JSON.parse(line);
+      let {eventName, region, owner, killTag, source} = JSON.parse(line);
       const signWith = await getUserIdentity(source);
-      //debug('kill', eventName, region, subject, signWith.authorId);
+      //debug('kill', eventName, region, killTag, signWith.authorId);
       if (!dryRun) {
-	if (!Array.isArray(subject)) subject = [subject]; // Normally just one subject, but chunked data has an array.
-	for (const msgId of subject) {
+	if (!Array.isArray(killTag)) killTag = [killTag]; // Normally just one killTag, but chunked data has an array.
+	for (const msgId of killTag) {
 	  tick();
-	  await networkPublisher.publish({eventName, region, owner, subject:msgId, signWith});
+	  await networkPublisher.publish({eventName, region, owner, killTag:msgId, signWith});
 	  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
 	}
       }
@@ -194,18 +196,18 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
   }
 }
 
-function recordForKill({eventName, region, owner, subject, source}) { // Asynchronously add to Record in killCache.txt.
-  return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, subject, source}) + EOL, 'utf8');
+function recordForKill({eventName, region, owner, killTag, source}) { // Asynchronously add to Record in killCache.txt.
+  return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, killTag, source}) + EOL, 'utf8');
 }
 let totalPublications = 0;
 let reportedSuccess = false;
 const topics = {}; // Map topic JSON string => {nPublished, isChunk, run1: {nReceivedKill, nReceivedPub}, run2: same}
-function countTopic(topic, subject) {
+function countTopic(topic, msgIds) {
   const topicKey = JSON.stringify(topic);
-  const isChunk = Array.isArray(subject);
+  const isChunk = Array.isArray(msgIds);
   const data = topics[topicKey] ??= {nPublished: 0, isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
   data.nPublished += 1;
-  totalPublications += isChunk ? subject.length : 1;
+  totalPublications += isChunk ? msgIds.length : 1;
   if (!metricsS || data.metrics) return;
   setTimeout(() => data.metrics = networkPublisher.peer.metrics(topic)
 	     .then(metrics => {
@@ -213,18 +215,18 @@ function countTopic(topic, subject) {
 	       data.metrics = metrics;
 	     }), metricsS * 1e3);
 }
-function record({eventName, region, owner, subject, source}, msgIds) { // Asynchronously recordForKill and countTopic
-  countTopic({name: eventName, region, owner}, msgIds || subject);
-  return recordForKill({eventName, region, owner, subject, source});
+function record({eventName, region, owner, killTag, source}, msgIds) { // Asynchronously recordForKill and countTopic
+  countTopic({name: eventName, region, owner}, msgIds || killTag);
+  return recordForKill({eventName, region, owner, killTag, source});
 }
 
 async function publish({eventName, region, owner, source, ...options}) { // Publish to network.
   const signWith = await getUserIdentity(source, region);
-  const subject = dryRun ? Date.now() : await networkPublisher.publish({eventName, region, owner, ...options, signWith});
-  debug('publish', eventName, region, source, signWith.authorId, subject);
-  await record({eventName, region, owner, subject, source});
+  const msgId = dryRun ? Date.now() : await networkPublisher.publish({eventName, region, owner, ...options, signWith});
+  debug('publish', eventName, region, source, signWith.authorId, msgId);
+  await record({eventName, region, owner, killTag:msgId, source});
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
-  return subject;
+  return msgId;
 }
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
@@ -260,14 +262,13 @@ async function publishAlert({lat, lng, // location on the globe
       if (filename && includeImages) {
 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
-	const signWith = await getUserIdentity(source, region);
+	const signWith = await getUserIdentity(replySource, region);
 	const {topic:file, msgIds} = await networkPublisher.chunkifyBlob({blob, region, signWith, maxDimension: 0});
 	debug('publish chunk', file, msgIds.length, 'chunks.');
 	totalPublications += msgIds.length;
 	payload.file = file;
-	await record(file, msgIds);
 	const {name, owner} = file;
-	await record({eventName:name, region, owner, subject: msgIds, source});
+	await record({eventName:name, region, owner, killTag:msgIds, source:replySource}, msgIds);
 	payload.name = filename;
 	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
       }
@@ -277,7 +278,7 @@ async function publishAlert({lat, lng, // location on the globe
   }
   totalAlerts++;
   if (!info) return;
-  log(makeURL({subject: alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
+  log(makeURL({alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
 
 await pause`Waiting ${pauseBeforePublishS} seconds before publishing.`;
@@ -297,7 +298,7 @@ for (const code of await readdir(streamingRootPath)) {
     for (const station of dataModule.default) {
       const {lat, lng, name, url, mime, homepage} = station;
       const title = new URL(homepage).host.replace(/^www\./, '');
-      const subject = await publishAlert({lat, lng, topicWithDefaultIcon: extended, replies: [
+      const msgId = await publishAlert({lat, lng, topicWithDefaultIcon: extended, replies: [
 	{message: `${title}: ${name} ${homepage} ${url}`}
       ]});
     }
@@ -372,7 +373,18 @@ if (!dryRun && subTimeoutS) {
     ]);
     delay.cancel(); // Do not leave timeout going after we get a successful response.
     if (success) log(`Successfully received at least the expected events in ${(Date.now() - start).toLocaleString()} ms.`);
-    else log("FAILED to receive all events.");
+    else {
+      log("FAILED to receive all events.");
+      for (const topicString in topics) {
+	const topicData = topics[topicString];
+	if (topicData[key].nReceivedPub !== topicData.nPublished) {
+	  const topicIdentifier = await deriveTopicIdBig(JSON.parse(topicString));
+	  const lookup = await networkSubscriber.peer.lookup(topicIdentifier);
+	  lookup.path = lookup.path.map(big => big.toString(16));
+	  log(`topic ${topicString} ${topicIdentifier.toString(16)} lookup:`, lookup);
+	}
+      }
+    }
     console.log('roots:', networkSubscriber.peer.health().axonRoles.filter(r => r.isRoot));
     await networkSubscriber.disconnect();
   }
