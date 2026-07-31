@@ -256,7 +256,8 @@ async function publishAlert({lat, lng, // location on the globe
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
     let payload = reply, replySource = source;
     if (reply.message) { // Each reply can be a string or an object with message and optional user and filename.
-      const {message, user = source, filename} = reply;
+      const {message, user = source, filename, add = 1} = reply;
+      eventTime += add * 60e3;
       replySource = user;
       payload = {message};
       if (filename && includeImages) {
@@ -272,8 +273,10 @@ async function publishAlert({lat, lng, // location on the globe
 	payload.name = filename;
 	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
       }
+    } else {
+      eventTime += 60e3;
     }
-    eventTime += 1e3;
+    if (eventTime > Date.now()) throw new Error(`Reply "${payload.message || payload}" is in the future.`);
     await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, source: replySource});
   }
   totalAlerts++;
