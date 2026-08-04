@@ -331,7 +331,7 @@ blankLine();
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
 await pause`Waiting ${pauseAfterPublishS} seconds before ${disconnectAfterPublish ? 'disconnecting the publishing node' : 'proceeding'}.`;
 console.log('roots:', networkPublisher.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
-if (disconnectAfterPublish) await networkPublisher.disconnect();
+if (disconnectAfterPublish) await networkPublisher.disconnect(console.log);
 
 if (!dryRun && subTimeoutS) {
   async function check(key) {
@@ -389,13 +389,13 @@ if (!dryRun && subTimeoutS) {
       }
     }
     console.log('roots:', networkSubscriber.peer.health().axonRoles.filter(r => r.isRoot));
-    await networkSubscriber.disconnect();
+    await networkSubscriber.disconnect(console.log);
   }
   await check('run1');
   subTimeoutS *= 2;
   await check('run2');
   blankLine();
-  if (!disconnectAfterPublish) await networkPublisher.disconnect();
+  if (!disconnectAfterPublish) await networkPublisher.disconnect(console.log);
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
   for (const topicString in topics) {
     const {nPublished, run1, run2, metrics} = topics[topicString];
