@@ -107,10 +107,10 @@ export const demoData = [
   ]},
   {lat: 44.93688628795094, lng: -93.26255321502686, eventTime: ago(6 * 60), tag: observer, source: 'f', replies: [
     {message: 'Door-to-door on Chicago Ave 35th–38th, asking for residents by name'},
-    {message: 'They skipped the businesses, only hitting apartments', add: 10, user: 'b'},
-    {message: 'Two of them, badges visible, clipboards, taking notes', add: 15, user: 'f'},
-    {message: 'They moved south past 35th now', add: 35, user: 'b'},
-    {message: 'Haven’t seen them since, might be done for today', add: 60, user: 'f'}
+    {message: 'They skipped the businesses, only hitting apartments', add: 5, user: 'b'},
+    {message: 'Two of them, badges visible, clipboards, taking notes', add: 2, user: 'f'},
+    {message: 'They moved south past 35th now', add: 5, user: 'b'},
+    {message: 'Haven’t seen them since, might be done for today', add: 30, user: 'f'}
   ]},
   {lat: 44.93396981648836, lng: -93.2772731781006, eventTime: ago(1 * 60), tag: observer, source: 'c', replies: [
     //{message: 'Vehicle matching earlier description seen near Nicollet & 38th'}
