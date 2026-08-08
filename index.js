@@ -29,6 +29,11 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Run with info logging."
       })
+      .option('logConnectivity', {
+	type: 'boolean',
+	default: false,
+	description: "Log extra information about node connectivity."
+      })
       .option('verbose', {
 	alias: 'v',
 	type: 'boolean',
@@ -114,7 +119,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 
 function log(...rest) { // If info, log args (with newline at end).
@@ -131,6 +136,8 @@ function debug(...rest) { // If info, log args (with newline at end).
   if (!verbose) return;
   log(...rest);
 }
+var disconnectLogger = !logConnectivity ? undefined : console.log;
+
 function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePublishS} seconds before publishing.`
   // Tagged template function that logs the interpolated string and pauses the first value amount of seconds.
   // The returned promise also has a cancel() method that will cancel the timeout.
@@ -331,7 +338,7 @@ blankLine();
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
 await pause`Waiting ${pauseAfterPublishS} seconds before ${disconnectAfterPublish ? 'disconnecting the publishing node' : 'proceeding'}.`;
 console.log('roots:', networkPublisher.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
-if (disconnectAfterPublish) await networkPublisher.disconnect(console.log);
+if (disconnectAfterPublish) await networkPublisher.disconnect(disconnectLogger);
 
 if (!dryRun && subTimeoutS) {
   async function check(key) {
@@ -388,14 +395,13 @@ if (!dryRun && subTimeoutS) {
 	}
       }
     }
-    console.log('roots:', networkSubscriber.peer.health().axonRoles.filter(r => r.isRoot));
-    await networkSubscriber.disconnect(console.log);
+    await networkSubscriber.disconnect(disconnectLogger);
   }
   await check('run1');
   subTimeoutS *= 2;
   await check('run2');
   blankLine();
-  if (!disconnectAfterPublish) await networkPublisher.disconnect(console.log);
+  if (!disconnectAfterPublish) await networkPublisher.disconnect(disconnectLogger);
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
   for (const topicString in topics) {
     const {nPublished, run1, run2, metrics} = topics[topicString];
