@@ -272,12 +272,13 @@ async function publishAlert({lat, lng, // location on the globe
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
 	const signWith = await getUserIdentity(replySource, region);
 	const {topic:file, msgIds} = await networkPublisher.chunkifyBlob({blob, region, signWith, maxDimension: 0});
-	debug('publish chunk', file, msgIds.length, 'chunks.');
-	totalPublications += msgIds.length;
+	debug('publish chunk', file, msgIds?.length, 'chunks.');
 	payload.file = file;
 	const {name, owner} = file;
-	await record({eventName:name, region, owner, killTag:msgIds, source:replySource}, msgIds);
 	payload.name = filename;
+	if (msgIds) { // Falsy for DHT="0" tests.
+	  await record({eventName:name, region, owner, killTag:msgIds, source:replySource}, msgIds);
+	}
 	if (throttleMS) await P2PWebNetwork.delay(throttleMS);
       }
     } else {
