@@ -4,7 +4,7 @@ import { readdir, open, rm, appendFile } from 'node:fs/promises';
 import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { demoData, users, styles as demoStyles } from './demo-data.js';
+import { demoData, users, styles as demoStyles, ago } from './demo-data.js';
 import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
@@ -12,7 +12,7 @@ const imageToUri = (await import('image-to-uri')).default;
 const start = Date.now();
 process.title = 'axona-alert-bot'; // Handy for debugging when you have lots of nodejs processes.
 const extendedStyles = radioStyles.concat(demoStyles);
-const extendedMap = {}
+const extendedMap = {};
 extendedStyles.forEach(extended => extendedMap[canonicalTag(extended)] = extended);
 
 // Command-line args. Here we use the yargs package to parse.
@@ -42,9 +42,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('tags', {
 	type: 'string', array: true,
-	default: radioStyles.map(canonicalTag).concat('observer corp demo', 'community support demo', 'utility repair demo',
-						      'fire', 'ice', 'flood',
-						      'help', 'cake'),
+	default: radioStyles.map(canonicalTag).concat(demoStyles),
 	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
       })
       .option('regions', {
@@ -121,6 +119,7 @@ const argv = yargs(hideBin(process.argv))
 
 let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
+const canonicalTags = tags.map(tag => canonicalTag(tag));
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info && !debug) return;
@@ -239,13 +238,13 @@ async function publish({eventName, region, owner, source, ...options}) { // Publ
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
 let totalAlerts = 0;
 async function publishAlert({lat, lng, // location on the globe
-			     eventTime = Date.now(), // Javscript timestamp
+			     eventTime = ago(3), // Javscript timestamp
 			     source = 'alert-bot', // Identifier key in users dictionary. (Not the handle.)
 			     replies = [], // Additional information, if any.
 			     topicWithDefaultIcon, // Hashtag with a leading emoji used as an icon on the map.
 			     topicKey = canonicalTag(topicWithDefaultIcon) // Stripping off any leading emoji.
 			    }) {
-  if (!tags.includes(topicKey)) return;
+  if (!canonicalTags.includes(topicKey)) return;
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
  
   // First we publish the "alert" - which will appear as an icon on the map.  
@@ -301,7 +300,7 @@ for (const code of await readdir(streamingRootPath)) {
   for (const styleFileName of await readdir(codeDir)) {
     const style = styleFileName.slice(0, -'.json'.length);
     const canonical = canonicalTag(style)
-    if (!tags.includes(canonical)) continue; // optimization
+    if (!canonicalTags.includes(canonical)) continue; // optimization
     const extended = extendedMap[canonical];
     const path = `${codeDir}/${styleFileName}`;
     const dataModule = await import(path, {with: { type: 'json' }})

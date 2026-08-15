@@ -14,9 +14,9 @@ const medic = "⛑️ medic";
 const hospital = "🏥 hospital";
 const rally = "🪧 rally";
 const restroom = "🚻 restroom";
-export const styles = [fire, ice, flood, cake, democrazy, help, avoid, clear, medic, hospital, rally, restroom];
+export const styles = [fire, ice, flood, cake, democrazy, help, avoid, clear, medic, hospital, rally, restroom, observer, community, utility];
 
-function ago(targetMinutes, rangeMinutes = 1) { // Return a random time approximately targetMintues ago
+export function ago(targetMinutes, rangeMinutes = 1) { // Return a random time approximately targetMintues ago
   const ago = targetMinutes * 60e3 + rangeMinutes/2 * 60e3 - Math.random() * rangeMinutes/2 * 60e3;
   return Math.round(Date.now() - Math.max(0, ago)); // Do not go into the future.
 }
@@ -152,17 +152,17 @@ export const demoData = [
   ]},
 
   // Flood
-  {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: flood,
-   //replies: [{message: 'Maybe the damn burst will put the fires out?', user: 'user2'}]
-  },
-  {lat: 50, lng: 17, eventTime: ago(1), tag: flood, replies: [{message: 'Canned data in eastern europe', user: 'user2'}]},
+  // {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: flood,
+  //  replies: [{message: 'Maybe the damn burst will put the fires out?', user: 'user2'}]
+  // },
+  // {lat: 50, lng: 17, eventTime: ago(1), tag: flood, replies: [{message: 'Canned data in eastern europe', user: 'user2'}]},
 
   // Ice
-  {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: ice},
-  {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(800), tag: ice},
-  {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: ice},
-  {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: ice/*, replies: "They aren't stopping!"*/},
-  {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(3), tag: ice, replies: [
+  {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: observer},
+  {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(800), tag: observer},
+  {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: observer},
+  {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: observer, replies: "They aren't stopping!"},
+  {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(3), tag: observer, replies: [
     {message: "Avoid this area!", user: 'user2',
      filename: "ice-image.jpg"
     },
