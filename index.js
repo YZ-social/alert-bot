@@ -4,7 +4,7 @@ import { readdir, open, rm, appendFile } from 'node:fs/promises';
 import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { demoData, users, styles as demoStyles, ago } from './demo-data.js';
+import { demoData, users, styles as demoStyles, ago, fire } from './demo-data.js';
 import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath} from './common.js';
 const imageToUri = (await import('image-to-uri')).default;
@@ -315,6 +315,57 @@ for (const code of await readdir(streamingRootPath)) {
   }
 }
 
+async function* readLines(response) { // Like NodeJS file.readLines, but for a fetch response.
+  const reader = response.body
+    .pipeThrough(new TextDecoderStream())
+    .getReader();
+  let previous = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      previous += value;
+      let eolIndex;
+      while ((eolIndex = previous.indexOf("\n")) >= 0) {
+        yield previous.slice(0, eolIndex);
+        previous = previous.slice(eolIndex + 1);
+      }
+    }
+    if (previous.length > 0) {
+      yield previous;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+if (canonicalTags.includes('fire')) {
+  //const response = await open('fire.csv').catch(console.error);
+  //if (file) {
+  const response = await fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv');
+  //const response = await fetch('file:///Users/howardstearns/Documents/yz/alert-bot/fire.csv');
+  console.log(response);
+  if (response.ok) {
+    const cutoff = Date.now() - 24 * 60 * 60e3;
+    let skipped = 0, counted = 0;
+    for await (const line of readLines(response)) { //response.readLines()) {
+      if (line.startsWith('latitude')) continue;
+      const [latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight] = line.split(',');
+      if (confidence === 'low') continue;
+      //if (confidence !== 'high') continue
+      const eventTime = new Date(`${acq_date}T${acq_time.slice(0, 2)}:${acq_time.slice(2)}Z`).getTime();
+      if (eventTime < cutoff) {
+	console.log('skipping expired event', new Date(eventTime));
+	skipped++;
+	continue;
+      }
+      counted++;
+      await publishAlert({lat: latitude, lng: longitude, topicWithDefaultIcon: fire, source: 'firms', eventTime});
+    }
+    console.log('skipped:', skipped, 'included:', counted);
+  }
+}
+
 // Post each datum.
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
   const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
@@ -388,10 +439,14 @@ if (!dryRun && subTimeoutS) {
       for (const topicString in topics) {
 	const topicData = topics[topicString];
 	if (topicData[key].nReceivedPub !== topicData.nPublished) {
-	  const topicIdentifier = await deriveTopicIdBig(JSON.parse(topicString));
-	  const lookup = await networkSubscriber.peer.lookup(topicIdentifier);
-	  lookup.path = lookup.path.map(big => big.toString(16));
-	  log(`topic ${topicString} ${topicIdentifier.toString(16)} lookup:`, lookup);
+	  if (topicData.nPublished > 1000) {
+	    log(`topic ${topicString} published ${topicData[key]} and rolled over to send ${topicData.nPublished}.`);
+	  } else {
+	    const topicIdentifier = await deriveTopicIdBig(JSON.parse(topicString));
+	    const lookup = await networkSubscriber.peer.lookup(topicIdentifier);
+	    lookup.path = lookup.path.map(big => big.toString(16));
+	    log(`topic ${topicString} ${topicIdentifier.toString(16)} lookup:`, lookup);
+	  }
 	}
       }
     }
