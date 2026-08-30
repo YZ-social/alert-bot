@@ -6,7 +6,8 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { demoData, users, styles as demoStyles, ago, fire } from './demo-data.js';
 import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
-import {styles as radioStyles, streamingRootPath} from './common.js';
+import {styles as radioStyles, streamingRootPath } from './common.js';
+import { saveUrlToFile } from './utils.js';
 const imageToUri = (await import('image-to-uri')).default;
 
 const start = Date.now();
@@ -315,40 +316,17 @@ for (const code of await readdir(streamingRootPath)) {
   }
 }
 
-async function* readLines(response) { // Like NodeJS file.readLines, but for a fetch response.
-  const reader = response.body
-    .pipeThrough(new TextDecoderStream())
-    .getReader();
-  let previous = "";
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      previous += value;
-      let eolIndex;
-      while ((eolIndex = previous.indexOf("\n")) >= 0) {
-        yield previous.slice(0, eolIndex);
-        previous = previous.slice(eolIndex + 1);
-      }
-    }
-    if (previous.length > 0) {
-      yield previous;
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
 if (canonicalTags.includes('fire')) {
-  //const response = await open('fire.csv').catch(console.error);
-  //if (file) {
-  const response = await fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv');
-  //const response = await fetch('file:///Users/howardstearns/Documents/yz/alert-bot/fire.csv');
-  console.log(response);
-  if (response.ok) {
+  await saveUrlToFile('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
+		      'fire.csv');
+  const response = await open('fire.csv').catch(console.error);
+  if (response) {
+    //const response = await fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv');
+    //const response = await fetch('file:///Users/howardstearns/Documents/yz/alert-bot/fire.csv');
+    // if (response.ok) {
     const cutoff = Date.now() - 24 * 60 * 60e3;
     let skipped = 0, counted = 0;
-    for await (const line of readLines(response)) { //response.readLines()) {
+    for await (const line of response.readLines()) { // readLines(response)) {
       if (line.startsWith('latitude')) continue;
       const [latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight] = line.split(',');
       if (confidence === 'low') continue;
@@ -440,7 +418,7 @@ if (!dryRun && subTimeoutS) {
 	const topicData = topics[topicString];
 	if (topicData[key].nReceivedPub !== topicData.nPublished) {
 	  if (topicData.nPublished > 1000) {
-	    log(`topic ${topicString} published ${topicData[key]} and rolled over to send ${topicData.nPublished}.`);
+	    log(`topic ${topicString} published ${topicData.nPublished} during rollover.`);
 	  } else {
 	    const topicIdentifier = await deriveTopicIdBig(JSON.parse(topicString));
 	    const lookup = await networkSubscriber.peer.lookup(topicIdentifier);

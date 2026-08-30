@@ -14,7 +14,7 @@ const medic = "⛑️ medic";
 const hospital = "🏥 hospital";
 const rally = "🪧 rally";
 const restroom = "🚻 restroom";
-export const styles = [fire, ice, flood, cake, democrazy, help, avoid, clear, medic, hospital, rally, restroom, observer, community, utility];
+export const styles = [/*fire, */ice, flood, cake, democrazy, help, avoid, clear, medic, hospital, rally, restroom, observer, community, utility];
 
 export function ago(targetMinutes, rangeMinutes = 1) { // Return a random time approximately targetMintues ago
   const ago = targetMinutes * 60e3 + rangeMinutes/2 * 60e3 - Math.random() * rangeMinutes/2 * 60e3;
@@ -23,7 +23,7 @@ export function ago(targetMinutes, rangeMinutes = 1) { // Return a random time a
 
 export const users = {
   ['alert-bot']: {handle: 'alert-bot', avatar: 'alert-bot.jpg', dump: '{"kind":"author","pubkey":"5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b","privkey":"MC4CAQAwBQYDK2VwBCIEIIb8LcDnTDWtOWCAm8OxxUGn/pmCQD4NDRW/DvqVdxMW","createdAt":1783202744364}'},
-  firms: {handle: 'NASA LANCE FIRMS', avatar: 'alert-bot.jpg', dump: '{"kind":"author","pubkey":"7b12c01445424995d30102717c5218a2ed9567febe5b1f386b003f8dccf45097","privkey":"MC4CAQAwBQYDK2VwBCIEIGeYsn1BG2CN5dEU/R9kUC6023CkLszqpobeidv8CvjJ","createdAt":1786585174981}'},
+  firms: {handle: 'NASA LANCE FIRMS NOAA-21', avatar: 'alert-bot.jpg', dump: '{"kind":"author","pubkey":"7b12c01445424995d30102717c5218a2ed9567febe5b1f386b003f8dccf45097","privkey":"MC4CAQAwBQYDK2VwBCIEIGeYsn1BG2CN5dEU/R9kUC6023CkLszqpobeidv8CvjJ","createdAt":1786585174981}'},
   user2: {handle: 'alice', avatar: 'alice.jpeg', dump: '{"kind":"author","pubkey":"d9980054573d559bd65459426a2ffd64ac384fb9de5fa2d2eb1334f1dbd9ab20","privkey":"MC4CAQAwBQYDK2VwBCIEIPpQLxN9mNrDZebALJz1jb03lpEMQ6I1wAQ+Yg4/2vHV","createdAt":1783300645760}'},
   user3: {handle: 'bob', avatar: 'bob.jpg', dump: '{"kind":"author","pubkey":"66ae6f79c7458e5393c2d80c3cb6dabf614e3e7085dbfd3dd388d5a4d0b5171b","privkey":"MC4CAQAwBQYDK2VwBCIEIMTEQ6txMRj6io/i9HMF9p7Vt9R+Dyck6hfMTD1j+IPQ","createdAt":1783300703080}'},
 
