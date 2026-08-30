@@ -43,7 +43,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('tags', {
 	type: 'string', array: true,
-	default: radioStyles.map(canonicalTag).concat(demoStyles),
+	default: extendedStyles,
 	description: "Space-separated enumeration of canonical tags to publish (without emoji)."
       })
       .option('regions', {
