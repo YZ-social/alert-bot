@@ -309,8 +309,8 @@ for (const code of await readdir(streamingRootPath)) {
     for (const station of dataModule.default) {
       const {lat, lng, name, url, mime, homepage} = station;
       const title = new URL(homepage).host.replace(/^www\./, '');
-      const msgId = await publishAlert({lat, lng, topicWithDefaultIcon: extended, source: 'RadioBrowser', replies: [
-	{message: `${title}: ${name} ${homepage} ${url}`}
+      const msgId = await publishAlert({lat, lng, topicWithDefaultIcon: extended, replies: [
+	{message: `${title}: ${name} ${homepage} ${url}`, user: 'RadioBrowser'}
       ]});
     }
   }
