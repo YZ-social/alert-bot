@@ -83,7 +83,7 @@ export const demoData = [
 
   // Demo script
   // http://civildefense.io/?bridge=wss://testnet.axona.net&tags=%F0%9F%A9%B7%20community%20support%20DEMO,%F0%9F%91%81%EF%B8%8F%20observer%20corps%20DEMO,%F0%9F%A7%B0%20utility%20repairs%20DEMO&lat=44.948797641130824&lng=-93.26159758507859&z=14
-  {lat: 44.95914228777231, lng: -93.24729681015016, eventTime: ago(21 * 60), tag: observer, source: 'b', replies: [
+  {lat: 44.959116289453725, lng: -93.2473777448331, eventTime: ago(21 * 60), tag: observer, source: 'b', replies: [
     {message: 'Checkpoint at Cedar & 24th, vehicles stopped in both directions'},
     {message: 'I see them, 4 vehicles, looks like they’re checking IDs', filename: "roadblock.jpg", user: 'a'},
     {message: 'Northbound only, southbound lane is clear', user: 'a', add: 8},
