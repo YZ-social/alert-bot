@@ -19,28 +19,7 @@ extendedStyles.forEach(extended => extendedMap[canonicalTag(extended)] = extende
 // Command-line args. Here we use the yargs package to parse.
 const argv = yargs(hideBin(process.argv))
       .usage(`Publish CivilDefense.io alerts.`)
-      .option('baseURL', {
-	type: 'string',
-	default: 'https://civildefense.io/',
-	description: "The base URL where the results can be reached."
-      })
-      .option('info', {
-	alias: 'i',
-	type: 'boolean',
-	default: true,
-	description: "Run with info logging."
-      })
-      .option('logConnectivity', {
-	type: 'boolean',
-	default: false,
-	description: "Log extra information about node connectivity."
-      })
-      .option('verbose', {
-	alias: 'v',
-	type: 'boolean',
-	default: false,
-	description: "Run with extra debug logging."
-      })
+
       .option('tags', {
 	type: 'string', array: true,
 	default: extendedStyles,
@@ -54,6 +33,70 @@ const argv = yargs(hideBin(process.argv))
 	type: 'boolean',
 	default: true,
 	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
+      })
+      .option('dryRun', {
+	type: 'boolean',
+	default: false,
+	description: "Skip actual publication."
+      })
+      .option('includeImages', {
+	type: 'boolean',
+	default: true,
+	description: "Include any image attachments that may be in the data."
+      })
+
+      .option('baseURL', {
+	type: 'string',
+	default: 'https://civildefense.io/',
+	description: "The base URL where the results can be reached, for generating inspection URLs."
+      })
+      .option('info', {
+	alias: 'i',
+	type: 'boolean',
+	default: true,
+	description: "Run with info logging."
+      })
+      .option('verbose', {
+	alias: 'v',
+	type: 'boolean',
+	default: false,
+	description: "Run with extra debug logging."
+      })
+      .option('logConnectivity', {
+	type: 'boolean',
+	default: false,
+	description: "Log extra information about node connectivity."
+      })
+      .option('lookupFailedTopics', {
+	type: 'boolean',
+	default: false,
+	description: "Log extra information about the lookup reachability of any topics that fail."
+      })
+      .option('metricsS', {
+	type: 'number',
+	default: 0,
+	description: "Number of seconds to wait after first publish to a topic before requesting its metrics. A value of 0 does not collect metrics at all. Forces a pauseAfterPublishS of at least this time."
+      })
+
+      .option('throttleMS', {
+	type: 'number',
+	default: 50,
+	description: "Number of milliseconds to pause between publish actions."
+      })
+      .option('subStaggerMs', {
+	type: 'number',
+	default: 0,
+	description: "Milliseconds to wait between each topic subscription. 0 (default) subscribes to all topics at once (a burst); a positive value spreads them out, closer to how real subscribers arrive and a fairer test of the system under load."
+      })
+      .option('disconnectAfterPublish', {
+	type: 'boolean',
+	default: true,
+	description: "Whether to disconnect the publisher before running confirmations. (Otherwise disconnects at exit.)"
+      })
+      .option('subTimeoutS', {
+	type: 'number',
+	default: 30,
+	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
       })
       .option('pauseBeforeDeleteS', {
 	type: 'number',
@@ -70,16 +113,6 @@ const argv = yargs(hideBin(process.argv))
 	default: 0,
 	description: "Number of seconds to wait after all publications, before disconnecting or proceeding."
       })
-      .option('disconnectAfterPublish', {
-	type: 'boolean',
-	default: true,
-	description: "Whether to disconnect the publisher before running confirmations. (Otherwise disconnects at exit.)"
-      })
-      .option('metricsS', {
-	type: 'number',
-	default: 0,
-	description: "Number of seconds to wait after first publish to a topic before requesting its metrics. A value of 0 does not collect metrics at all. Forces a pauseAfterPublishS of at least this time."
-      })
       .option('pauseBeforeRestartS', {
 	type: 'number',
 	default: 0,
@@ -90,40 +123,15 @@ const argv = yargs(hideBin(process.argv))
 	default: 0,
 	description: "Number of seconds to wait between re-joining and subscribing."
       })
-      .option('subTimeoutS', {
-	type: 'number',
-	default: 30,
-	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
-      })
-      .option('throttleMS', {
-	type: 'number',
-	default: 50,
-	description: "Number of milliseconds to pause between publish actions."
-      })
-      .option('subStaggerMs', {
-	type: 'number',
-	default: 0,
-	description: "Milliseconds to wait between each topic subscription. 0 (default) subscribes to all topics at once (a burst); a positive value spreads them out, closer to how real subscribers arrive and a fairer test of the system under load."
-      })
-      .option('dryRun', {
-	type: 'boolean',
-	default: false,
-	description: "Skip actual publication."
-      })
-      .option('includeImages', {
-	type: 'boolean',
-	default: true,
-	description: "Include any image attachments that may be in the data."
-      })
       .strict()
       .parse();
 
-let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 const canonicalTags = tags.map(tag => canonicalTag(tag));
 
 function log(...rest) { // If info, log args (with newline at end).
-  if (!info && !debug) return;
+  if (!info && !verbose) return;
   console.log(new Date().toLocaleTimeString(), ...rest);
 }
 function blankLine() { // If info, log a blank line.
@@ -160,11 +168,11 @@ function makeURL({alertIdentifier, lat, lng, tag}) {
   return url.href;
 }
 function create() {
-  return P2PWebNetwork.create({location, infoLogger: log, debugLogger: debug});
+  return P2PWebNetwork.create({location, infoLogger: info && log, debugLogger: verbose && debug});
 }
 
 // Create a p2p node and connect to the YZ network.
-let networkPublisher = await create();
+let networkNode = await create();
 
 async function getUserIdentity(source, region) { // Promise the author identity labeled by source in the users dictionary, and add region to the list of regions in which it was used.
   let user = users[source];
@@ -192,7 +200,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
 	if (!Array.isArray(killTag)) killTag = [killTag]; // Normally just one killTag, but chunked data has an array.
 	for (const msgId of killTag) {
 	  tick();
-	  await networkPublisher.publish({eventName, region, owner, killTag:msgId, signWith});
+	  await networkNode.publish({eventName, region, owner, killTag:msgId, signWith});
 	  if (throttleMS) await P2PWebNetwork.delay(throttleMS);
 	}
       }
@@ -216,7 +224,7 @@ function countTopic(topic, msgIds) {
   data.nPublished += 1;
   totalPublications += isChunk ? msgIds.length : 1;
   if (!metricsS || data.metrics) return;
-  setTimeout(() => data.metrics = networkPublisher.peer.metrics(topic)
+  setTimeout(() => data.metrics = networkNode.peer.metrics(topic)
 	     .then(metrics => {
 	       debug('metrics for:', topic, metrics);
 	       data.metrics = metrics;
@@ -229,7 +237,7 @@ function record({eventName, region, owner, killTag, source}, msgIds) { // Asynch
 
 async function publish({eventName, region, owner, source, ...options}) { // Publish to network.
   const signWith = await getUserIdentity(source, region);
-  const msgId = dryRun ? Date.now() : await networkPublisher.publish({eventName, region, owner, ...options, signWith});
+  const msgId = dryRun ? Date.now() : await networkNode.publish({eventName, region, owner, ...options, signWith});
   debug('publish', eventName, region, source, signWith.authorId, msgId);
   await record({eventName, region, owner, killTag:msgId, source});
   if (throttleMS) await P2PWebNetwork.delay(throttleMS);
@@ -271,7 +279,7 @@ async function publishAlert({lat, lng, // location on the globe
 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
 	const signWith = await getUserIdentity(replySource, region);
-	const {topic:file, msgIds} = await networkPublisher.chunkifyBlob({blob, region, signWith, maxDimension: 0});
+	const {topic:file, msgIds} = await networkNode.chunkifyBlob({blob, region, signWith, maxDimension: 0});
 	debug('publish chunk', file, msgIds?.length, 'chunks.');
 	payload.file = file;
 	const {name, owner} = file;
@@ -284,7 +292,8 @@ async function publishAlert({lat, lng, // location on the globe
     } else {
       eventTime += 60e3;
     }
-    if (eventTime > Date.now()) throw new Error(`Reply "${payload.message || payload}" is in the future.`);
+    const future = eventTime - Date.now();
+    if (future > 0) throw new Error(`Reply "${payload.message || payload}" is in the future by ${future / 60e3} minutes.`);
     await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, source: replySource});
   }
   totalAlerts++;
@@ -366,16 +375,18 @@ for (const key of Object.keys(users)) {
 blankLine();
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
 await pause`Waiting ${pauseAfterPublishS} seconds before ${disconnectAfterPublish ? 'disconnecting the publishing node' : 'proceeding'}.`;
-console.log('roots:', networkPublisher.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
-if (disconnectAfterPublish) await networkPublisher.disconnect(disconnectLogger);
+debug("publisher's roots:", networkNode.peer.health().axonRoles.filter(r => r.isRoot).map(r => r.topic));
+if (disconnectAfterPublish) {
+  await networkNode.disconnect(disconnectLogger);
+  networkNode = null;
+}
 
 if (!dryRun && subTimeoutS) {
   async function check(key) {
     blankLine();
-    await pause`Waiting ${pauseBeforeRestartS} seconds before creating new node to confirm delivery for ${key}.`;
-    // Subscribe to everything in parallel.
-    const networkSubscriber = await create();
-    await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this new node.`;
+    await pause`Waiting ${pauseBeforeRestartS} seconds before ${networkNode ? 'confirming' : 'creating new node to confirm'} delivery for ${key}.`;
+    if (!networkNode) networkNode = await create();
+      await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this node.`;
     const topicStrings = Object.keys(topics);
     log(`Subscribing to ${topicStrings.length} topics${subStaggerMs ? ` (staggered ${subStaggerMs}ms apart)` : ''}.`);
     const receivedAll = [];
@@ -391,8 +402,8 @@ if (!dryRun && subTimeoutS) {
       };
       receivedAll.push(promise);
       return topicData.isChunk ?
-	networkSubscriber.assembleChunkedDataURL({name, region, owner}).then(handler) :
-	networkSubscriber.subscribe({eventName: name, region, owner, handler});
+	networkNode.assembleChunkedDataURL({name, region, owner}).then(handler) :
+	networkNode.subscribe({eventName: name, region, owner, handler});
     };
     if (subStaggerMs) {                       // spread subscribes out — a fairer, more realistic test
       for (const topicString of topicStrings) {
@@ -419,22 +430,22 @@ if (!dryRun && subTimeoutS) {
 	if (topicData[key].nReceivedPub !== topicData.nPublished) {
 	  if (topicData.nPublished > 1000) {
 	    log(`topic ${topicString} published ${topicData.nPublished} during rollover.`);
-	  } else {
+	  } else if (lookupFailedTopics) {
 	    const topicIdentifier = await deriveTopicIdBig(JSON.parse(topicString));
-	    const lookup = await networkSubscriber.peer.lookup(topicIdentifier);
+	    const lookup = await networkNode.peer.lookup(topicIdentifier);
 	    lookup.path = lookup.path.map(big => big.toString(16));
 	    log(`topic ${topicString} ${topicIdentifier.toString(16)} lookup:`, lookup);
 	  }
 	}
       }
     }
-    await networkSubscriber.disconnect(disconnectLogger);
+    await networkNode.disconnect(disconnectLogger);
+    networkNode = null;
   }
   await check('run1');
   subTimeoutS *= 2;
   await check('run2');
   blankLine();
-  if (!disconnectAfterPublish) await networkPublisher.disconnect(disconnectLogger);
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
   for (const topicString in topics) {
     const {nPublished, run1, run2, metrics} = topics[topicString];
@@ -442,7 +453,7 @@ if (!dryRun && subTimeoutS) {
       nPubFails++;
       if (run1.nReceivedPub !== run2.nReceivedPub) nDeviations++;
       log(`Topic ${topicString} published ${nPublished} but received ${run1.nReceivedPub} and ${run2.nReceivedPub} events!`);
-      log(`metrics ${metricsS} seconds after publish:`, metrics);
+      if (metricsS) log(`metrics ${metricsS} seconds after publish:`, metrics);
     } else if (run1.nReceivedKill || run2.nReceivedKill) {
       nKillFails++;
       if (run1.nReceivedKill !== run2.nReceivedKill) nDeviations++;

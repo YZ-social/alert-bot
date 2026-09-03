@@ -1,6 +1,6 @@
-const observer = "👁️ observer corps DEMO";
-const community = "🩷 community support DEMO";
-const utility = "🧰 utility repairs DEMO";
+const observer = "👁️ observer DEMO";
+const community = "🩷 community DEMO";
+const utility = "🧰 utility DEMO";
 export const fire = "🔥 fire"; // With emoji so that people who just add the topic "fire" have a nice icon on the map.
 const ice = "🧊 ice";
 const flood = "🌊 flood";
@@ -15,6 +15,11 @@ const hospital = "🏥 hospital";
 const rally = "🪧 rally";
 const restroom = "🚻 restroom";
 export const styles = [/*fire, */ice, flood, cake, democrazy, help, avoid, clear, medic, hospital, rally, restroom, observer, community, utility];
+
+const iceTest = "🧊 iceTest";
+const floodTest = "🌊 floodTest";
+const fireTest = "🔥 fireTest";
+
 
 export function ago(targetMinutes, rangeMinutes = 1) { // Return a random time approximately targetMintues ago
   const ago = targetMinutes * 60e3 + rangeMinutes/2 * 60e3 - Math.random() * rangeMinutes/2 * 60e3;
@@ -83,7 +88,7 @@ export const demoData = [
 
   // Demo script
   // http://civildefense.io/?bridge=wss://testnet.axona.net&tags=%F0%9F%A9%B7%20community%20support%20DEMO,%F0%9F%91%81%EF%B8%8F%20observer%20corps%20DEMO,%F0%9F%A7%B0%20utility%20repairs%20DEMO&lat=44.948797641130824&lng=-93.26159758507859&z=14
-  {lat: 44.959116289453725, lng: -93.2473777448331, eventTime: ago(21 * 60), tag: observer, source: 'b', replies: [
+  {lat: 44.959116289453725, lng: -93.2473777448331, eventTime: ago(13 * 60), tag: observer, source: 'b', replies: [
     {message: 'Checkpoint at Cedar & 24th, vehicles stopped in both directions'},
     {message: 'I see them, 4 vehicles, looks like they’re checking IDs', filename: "roadblock.jpg", user: 'a'},
     {message: 'Northbound only, southbound lane is clear', user: 'a', add: 8},
@@ -94,15 +99,15 @@ export const demoData = [
     {message: 'They’re packing up', user: 'a', add: 1.5 * 60},
     {message: 'All clear, drove past, nobody there', user: 'c', add: 2 * 60}
   ]},
-  {lat: 44.94876330298185, lng: -93.24740409851076, eventTime: ago(17 * 60), tag: observer, source: 'e', replies: [
+  {lat: 44.94876330298185, lng: -93.24740409851076, eventTime: ago(11 * 60), tag: observer, source: 'e', replies: [
     {message: 'Unmarked white van, Cedar Ave near Lake St, 3 individuals in vests, stationary 30+ min', filename: 'white-van.jpg'},
     {message: 'Same van was on Franklin yesterday around noon, I got a partial plate', add: 15, user: 'd'},
     {message: 'MN plates, starts with EF', add: 5, user: 'e'},
     {message: 'They moved, now parked on 2nd Ave near the halal store', add: 180, user: 'd'},
     {message: 'Gone from 2nd Ave', add: 3 * 60, user: 'f'},
-    {message: 'FYI someone posted about a similar van last week, different topic', add: 2 * 60, user: 'e'}
+    {message: 'FYI someone posted about a similar van last week, different topic', add: 4 * 60, user: 'e'}
   ]},
-  {lat: 44.944693196058864, lng: -93.25246810913087, eventTime: ago(9 * 60), tag: observer, source: 'g', replies: [
+  {lat: 44.944693196058864, lng: -93.25246810913087, eventTime: ago(8 * 60), tag: observer, source: 'g', replies: [
     {message: 'All clear — Bloomington & 32nd presence has dispersed as of 2pm'},
     {message: 'Confirmed, I walked past just now, nothing there', add: 30, user: 'g'},
     {message: 'Thanks for posting this, was nervous to go out', add: 90, user: 'h'}
@@ -121,13 +126,13 @@ export const demoData = [
     //{message: 'Two people in suits photographing building entrances, Nicollet & 42nd'}
   ]},
 
-  {lat: 44.95596121834308, lng: -93.26585769653322, eventTime: ago(16 * 60), tag: utility, source: 'x', replies: [
+  {lat: 44.95596121834308, lng: -93.26585769653322, eventTime: ago(13 * 60), tag: utility, source: 'x', replies: [
     {message: 'Water main break at Park Ave & 26th, avoid area, road flooded', filename: 'water-main.jpg'},
-    {message: 'Road is completely flooded, bus rerouted', add: 20, user: 'x'},
-    {message: 'City crew is here working on it', add: 3 * 60 - 20, user: 'y'},
-    {message: 'Fixed overnight, road is open but still wet', add: 11 * 60, user: 'x'}
+    {message: 'Road is completely flooded, bus rerouted', add: 15, user: 'x'},
+    {message: 'City crew is here working on it', add: 3 * 60 - 15, user: 'y'},
+    {message: 'Fixed overnight, road is open but still wet', add: 10 * 60 - 2, user: 'x'}
   ]},
-  {lat: 44.92698183440127, lng: -93.26753139495851, eventTime: ago(8 * 60), tag: utility, source: 'z', replies: [
+  {lat: 44.92698183440127, lng: -93.26753139495851, eventTime: ago(60), tag: utility, source: 'z', replies: [
     {message: 'Power outage affecting blocks around Portland & 42nd, Xcel aware'},
     {message: 'Xcel says estimated restore 6pm', add: 45, user: 'z'}
   ]},
@@ -143,28 +148,28 @@ export const demoData = [
   ]},
 
   // Fire
-  // {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fire},
-  // {lat: 37.464503586118525, lng: -122.2788190841675, eventTime: ago(800), tag: fire},
-  // {lat: 37.46777358281261, lng: -122.27748870849611, eventTime: ago(600), tag: fire},
-  // {lat: 37.471626715651524, lng: -122.271526157856, eventTime: ago(400), tag: fire},
-  // {lat: 37.472563358818114, lng: -122.26354122161867, eventTime: ago(200), tag: fire, replies: 'Here we go'},
-  // {lat: 37.47179275779608, lng: -122.26040840148927, eventTime: ago(3), tag: fire, replies: [
-  //   {message: 'Getting closer!', user: 'user2', filename: 'fire-is-fast-1200w.jpg'},
-  //   {message: 'stay safe', user: 'user3'}
-  // ]},
+  {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fireTest},
+  {lat: 37.464503586118525, lng: -122.2788190841675, eventTime: ago(800), tag: fireTest},
+  {lat: 37.46777358281261, lng: -122.27748870849611, eventTime: ago(600), tag: fireTest},
+  {lat: 37.471626715651524, lng: -122.271526157856, eventTime: ago(400), tag: fireTest},
+  {lat: 37.472563358818114, lng: -122.26354122161867, eventTime: ago(200), tag: fireTest, replies: 'Here we go'},
+  {lat: 37.47179275779608, lng: -122.26040840148927, eventTime: ago(3), tag: fireTest, replies: [
+    {message: 'Getting closer!', user: 'user2', filename: 'fire-is-fast-1200w.jpg'},
+    {message: 'stay safe', user: 'user3'}
+  ]},
 
   // Flood
-  // {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: flood,
-  //  replies: [{message: 'Maybe the damn burst will put the fires out?', user: 'user2'}]
-  // },
-  // {lat: 50, lng: 17, eventTime: ago(1), tag: flood, replies: [{message: 'Canned data in eastern europe', user: 'user2'}]},
+  {lat: 37.467603274015495, lng: -122.26244688034059, eventTime: ago(1), tag: floodTest,
+   replies: [{message: 'Maybe the damn burst will put the fires out?', user: 'user2'}]
+  },
+  //{lat: 50, lng: 17, eventTime: ago(1), tag: floodTest, replies: [{message: 'Canned data in eastern europe', user: 'user2'}]},
 
   // Ice
-  {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: observer},
-  {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(800), tag: observer},
-  {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: observer},
-  {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: observer, replies: "They aren't stopping!"},
-  {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(3), tag: observer, replies: [
+  {lat: 37.48380854647693, lng: -122.24404960870746, eventTime: ago(1080), tag: iceTest},
+  {lat: 37.482867787390276, lng: -122.24594324827197, eventTime: ago(800), tag: iceTest},
+  {lat: 37.48134594614139, lng: -122.24717438220979, eventTime: ago(540), tag: iceTest},
+  {lat: 37.48033278708841, lng: -122.24909484386446, eventTime: ago(270), tag: iceTest, replies: "They aren't stopping!"},
+  {lat: 37.47896627769895, lng: -122.25022137165071, eventTime: ago(3), tag: iceTest, replies: [
     {message: "Avoid this area!", user: 'user2',
      filename: "ice-image.jpg"
     },
