@@ -4,7 +4,12 @@
   "description": "Adds data to civildefense.io.",
   "scripts": {
     "start": "node ./index.js",
-    "build": "node stationData.js"
+    "build": "node stationData.js",
+    "repoint-axona": "pushd node_modules/@yz-social/civildefense.io; npm link ../../../../axona-protocol; npm ls; popd",
+    "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://testnet.axona.net' node server/app.js --nPortals 3 &); popd",
+    "basic-check": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --includeImages false --tags floodTest fireTest iceTest",
+    "basic-diagnostics": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --verbose --logConnectivity --lookupFailedTopics --metricsS 20 --includeImages false --tags floodTest fireTest iceTest",    
+    "stop": "pkill yz.social"
   },
   "exports": {
     ".": "./index.js"
