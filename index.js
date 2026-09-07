@@ -276,7 +276,7 @@ async function publishAlert({lat, lng, // location on the globe
       const {message, user = source, filename, add = 1} = reply;
       eventTime += add * 60e3;
       replySource = user;
-      payload = {message};
+      payload = {message, lat, lng};
       if (filename && includeImages) {
 	const dataURL = imageToUri(`./images/${filename}`); // Synchronous. Go figure.
 	const blob = await P2PWebNetwork.dataURL2blob(dataURL, filename);
@@ -296,7 +296,7 @@ async function publishAlert({lat, lng, // location on the globe
     }
     const future = eventTime - Date.now();
     if (future > 0) throw new Error(`Reply "${payload.message || payload}" is in the future by ${future / 60e3} minutes.`);
-    await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, source: replySource});
+    await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source: replySource});
   }
   totalAlerts++;
   if (!info) return;
