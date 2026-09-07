@@ -5,7 +5,7 @@ import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { demoData, users, styles as demoStyles, ago, fire } from './demo-data.js';
-import { P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
+import { dht, P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath } from './common.js';
 import { saveUrlToFile } from './utils.js';
 const imageToUri = (await import('image-to-uri')).default;
@@ -246,6 +246,7 @@ async function publish({eventName, region, owner, source, ...options}) { // Publ
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
 let totalAlerts = 0;
+const publishInParallel = dht <= 0;
 async function publishAlert({lat, lng, // location on the globe
 			     eventTime = ago(3), // Javscript timestamp
 			     source = 'alert-bot', // Identifier key in users dictionary. (Not the handle.)
@@ -263,10 +264,11 @@ async function publishAlert({lat, lng, // location on the globe
   const cells = getContainingCells(lat, lng);
   const payload = {lat, lng};
   let alertIdentifier;
-  for (const cell of cells) {
-    const eventName = alertTopic(cell, topicKey);
-    const msgId = await publish({eventName, region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source});
-    alertIdentifier = msgId;
+  const p1 = cell => publish({eventName: alertTopic(cell, topicKey), region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source});
+  if (publishInParallel) {
+    alertIdentifier = (await Promise.all(cells.map(p1)))[0];
+  } else {
+    for (const cell of cells) alertIdentifier = await p1(cell);
   }
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
     let payload = reply, replySource = source;
