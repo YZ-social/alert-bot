@@ -328,8 +328,10 @@ for (const code of await readdir(streamingRootPath)) {
 }
 
 if (canonicalTags.includes('fire')) {
-  await saveUrlToFile('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
-		      'fire.csv');
+  await saveUrlToFile(
+    //'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
+    'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
+    'fire.csv');
   const response = await open('fire.csv').catch(console.error);
   if (response) {
     //const response = await fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv');
