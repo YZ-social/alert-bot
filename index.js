@@ -306,6 +306,28 @@ async function publishAlert({lat, lng, // location on the globe
 await pause`Waiting ${pauseBeforePublishS} seconds before publishing.`;
 blankLine();
 
+////////////////////////////////////////////////////////////////////////////////////
+// THE DATA
+
+// Publish the handle/avatar for each reporting user.
+for (const key of Object.keys(users)) {
+  const {handle, avatar, identity, regions = []} = users[key];
+  const issuedTime = Date.now();
+  for (const region of regions) {
+    const owner = identity.authorId;
+    if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
+    if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
+  }
+}
+
+// Demo Data
+for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
+  const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
+  if (regions && !regions.includes(region)) continue;
+  await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
+}
+
+// Radio Stations
 for (const code of await readdir(streamingRootPath)) {
   if (regions && !regions.includes(code)) continue;
   const codeDir = `${streamingRootPath}/${code}`;
@@ -327,6 +349,7 @@ for (const code of await readdir(streamingRootPath)) {
   }
 }
 
+// NASA FIRMS Fire Data
 if (canonicalTags.includes('fire')) {
   await saveUrlToFile(
     //'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
@@ -334,9 +357,6 @@ if (canonicalTags.includes('fire')) {
     'fire.csv');
   const response = await open('fire.csv').catch(console.error);
   if (response) {
-    //const response = await fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv');
-    //const response = await fetch('file:///Users/howardstearns/Documents/yz/alert-bot/fire.csv');
-    // if (response.ok) {
     const cutoff = Date.now() - 24 * 60 * 60e3;
     let skipped = 0, counted = 0;
     for await (const line of response.readLines()) { // readLines(response)) {
@@ -354,24 +374,6 @@ if (canonicalTags.includes('fire')) {
       await publishAlert({lat: latitude, lng: longitude, topicWithDefaultIcon: fire, source: 'firms', eventTime});
     }
     console.log('skipped:', skipped, 'included:', counted);
-  }
-}
-
-// Post each datum.
-for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
-  const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
-  if (regions && !regions.includes(region)) continue;
-  await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
-}
-
-// Publish the handle/avatar for each reporting user.
-for (const key of Object.keys(users)) {
-  const {handle, avatar, identity, regions = []} = users[key];
-  const issuedTime = Date.now();
-  for (const region of regions) {
-    const owner = identity.authorId;
-    if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
-    if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
   }
 }
 
