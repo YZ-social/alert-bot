@@ -309,17 +309,6 @@ blankLine();
 ////////////////////////////////////////////////////////////////////////////////////
 // THE DATA
 
-// Publish the handle/avatar for each reporting user.
-for (const key of Object.keys(users)) {
-  const {handle, avatar, identity, regions = []} = users[key];
-  const issuedTime = Date.now();
-  for (const region of regions) {
-    const owner = identity.authorId;
-    if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
-    if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
-  }
-}
-
 // Demo Data
 for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
   const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
@@ -377,6 +366,16 @@ if (canonicalTags.includes('fire')) {
   }
 }
 
+// Publish the handle/avatar for each reporting user.
+for (const key of Object.keys(users)) {
+  const {handle, avatar, identity, regions = []} = users[key];
+  const issuedTime = Date.now();
+  for (const region of regions) {
+    const owner = identity.authorId;
+    if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
+    if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
+  }
+}
 
 blankLine();
 log(`Deleted ${totalKilled} previous publications and then posted ${totalAlerts} alerts with ${totalPublications} total publications in ${Object.keys(topics).length} topics, in ${(Date.now() - start).toLocaleString()} ms.`);
