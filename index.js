@@ -248,6 +248,7 @@ async function publish({eventName, region, owner, source, ...options}) { // Publ
 let totalAlerts = 0;
 const publishInParallel = dht <= 0;
 async function publishAlert({lat, lng, // location on the globe
+			     label = '',
 			     eventTime = ago(3), // Javscript timestamp
 			     source = 'alert-bot', // Identifier key in users dictionary. (Not the handle.)
 			     replies = [], // Additional information, if any.
@@ -256,20 +257,20 @@ async function publishAlert({lat, lng, // location on the globe
 			    }) {
   if (!canonicalTags.includes(topicKey)) return;
   if (!Array.isArray(replies)) replies = [replies]; // Accept array or single reply.
- 
+
   // First we publish the "alert" - which will appear as an icon on the map.  
   // If the user opens it, it has a timestamp and an identicon for the source string.
   // To do this, we actually publish to a series of different eventNames based on map position. See s2.js.
   const region = P2PWebNetwork.regionCode(lat, lng);
   const cells = getContainingCells(lat, lng);
-  const payload = {lat, lng};
-  let alertIdentifier;
-  const p1 = cell => publish({eventName: alertTopic(cell, topicKey), region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source});
-  if (publishInParallel) {
-    alertIdentifier = (await Promise.all(cells.map(p1)))[0];
-  } else {
+  async function pubAllCells({payload, issuedTime, hashtag, source, alert}) {
+    const p1 = cell => publish({eventName: alertTopic(cell, topicKey), region, payload, issuedTime, hashtag, source, alert});
+    if (publishInParallel) return (await Promise.all(cells.map(p1)))[0];
+    let alertIdentifier;
     for (const cell of cells) alertIdentifier = await p1(cell);
   }
+  const alertIdentifier = await pubAllCells({payload: label ? {lat, lng, label} : {lat, lng}, source, issuedTime: eventTime, hashtag: topicWithDefaultIcon});
+  const first = replies[0];
   for (const reply of replies) { // If there is more information, post that as a "reply" to the alertIdentifier.
     let payload = reply, replySource = source;
     if (reply.message) { // Each reply can be a string or an object with message and optional user and filename.
@@ -296,7 +297,8 @@ async function publishAlert({lat, lng, // location on the globe
     }
     const future = eventTime - Date.now();
     if (future > 0) throw new Error(`Reply "${payload.message || payload}" is in the future by ${future / 60e3} minutes.`);
-    await publish({eventName: alertIdentifier, region, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source: replySource});
+    if (reply === first) await pubAllCells({alert: alertIdentifier, payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source: replySource});
+    else await publish({eventName: alertIdentifier, region,         payload, issuedTime: eventTime, hashtag: topicWithDefaultIcon, source: replySource});
   }
   totalAlerts++;
   if (!info) return;
@@ -310,10 +312,10 @@ blankLine();
 // THE DATA
 
 // Demo Data
-for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot'} of demoData) {
+for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot', label = ""} of demoData) {
   const region = P2PWebNetwork.regionCode(lat, lng).toString(16);
   if (regions && !regions.includes(region)) continue;
-  await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source});
+  await publishAlert({lat, lng, eventTime, topicWithDefaultIcon: tag, replies, source, label});
 }
 
 // Radio Stations
@@ -331,8 +333,8 @@ for (const code of await readdir(streamingRootPath)) {
     for (const station of dataModule.default) {
       const {lat, lng, name, url, mime, homepage} = station;
       const title = new URL(homepage).host.replace(/^www\./, '');
-      const msgId = await publishAlert({lat, lng, topicWithDefaultIcon: extended, replies: [
-	{message: `${title}: ${name} ${homepage} ${url}`, user: 'RadioBrowser'}
+      const msgId = await publishAlert({lat, lng, label:title, topicWithDefaultIcon: extended, replies: [
+	{message: `${name} ${homepage} ${url}`, user: 'RadioBrowser'}
       ]});
     }
   }

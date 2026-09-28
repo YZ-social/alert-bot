@@ -88,64 +88,82 @@ export const demoData = [
 
   // Demo script
   // http://civildefense.io/?bridge=wss://testnet.axona.net&tags=%F0%9F%A9%B7%20community%20support%20DEMO,%F0%9F%91%81%EF%B8%8F%20observer%20corps%20DEMO,%F0%9F%A7%B0%20utility%20repairs%20DEMO&lat=44.948797641130824&lng=-93.26159758507859&z=14
-  {lat: 44.959116289453725, lng: -93.2473777448331, eventTime: ago(13 * 60), tag: observer, source: 'b', replies: [
-    {message: 'Checkpoint at Cedar & 24th, vehicles stopped in both directions'},
-    {message: 'I see them, 4 vehicles, looks like they’re checking IDs', filename: "roadblock.jpg", user: 'a'},
-    {message: 'Northbound only, southbound lane is clear', user: 'a', add: 8},
-    {message: 'My neighbor just drove through, they waved her on, didn’t stop her', user: 'b', add: 22 - 8},
-    {message: 'Still there', user: 'a', add: 1.5 * 60 - 22},
-    {message: 'Legal observer heading over', user: 'b', add: 30},
-    {message: 'Legal observer on site, documenting', user: 'b', add: 30},
-    {message: 'They’re packing up', user: 'a', add: 1.5 * 60},
-    {message: 'All clear, drove past, nobody there', user: 'c', add: 2 * 60}
-  ]},
-  {lat: 44.94876330298185, lng: -93.24740409851076, eventTime: ago(11 * 60), tag: observer, source: 'e', replies: [
-    {message: 'Unmarked white van, Cedar Ave near Lake St, 3 individuals in vests, stationary 30+ min', filename: 'white-van.jpg'},
-    {message: 'Same van was on Franklin yesterday around noon, I got a partial plate', add: 15, user: 'd'},
-    {message: 'MN plates, starts with EF', add: 5, user: 'e'},
-    {message: 'They moved, now parked on 2nd Ave near the halal store', add: 180, user: 'd'},
-    {message: 'Gone from 2nd Ave', add: 3 * 60, user: 'f'},
-    {message: 'FYI someone posted about a similar van last week, different topic', add: 4 * 60, user: 'e'}
-  ]},
-  {lat: 44.944693196058864, lng: -93.25246810913087, eventTime: ago(8 * 60), tag: observer, source: 'g', replies: [
-    {message: 'All clear — Bloomington & 32nd presence has dispersed as of 2pm'},
-    {message: 'Confirmed, I walked past just now, nothing there', add: 30, user: 'g'},
-    {message: 'Thanks for posting this, was nervous to go out', add: 90, user: 'h'}
-  ]},
-  {lat: 44.93688628795094, lng: -93.26255321502686, eventTime: ago(6 * 60), tag: observer, source: 'f', replies: [
-    {message: 'Door-to-door on Chicago Ave 35th–38th, asking for residents by name'},
-    {message: 'They skipped the businesses, only hitting apartments', add: 5, user: 'b'},
-    {message: 'Two of them, badges visible, clipboards, taking notes', add: 2, user: 'f', filename: 'clipboards.jpg'},
-    {message: 'They moved south past 35th now', add: 5, user: 'b'},
-    {message: 'Haven’t seen them since, might be done for today', add: 30, user: 'f'}
-  ]},
-  {lat: 44.93396981648836, lng: -93.2772731781006, eventTime: ago(1 * 60), tag: observer, source: 'c', replies: [
-    //{message: 'Vehicle matching earlier description seen near Nicollet & 38th'}
-  ]},
-  {lat: 44.92728567738864, lng: -93.27740192413331, eventTime: ago(20), tag: observer, source: 'd', replies: [
+  {lat: 44.959116289453725, lng: -93.2473777448331, eventTime: ago(13 * 60), tag: observer, source: 'b',
+   label: "1899, East 24th Street, East Phillips, Phillips, Minneapolis, Hennepin County, Minnesota, 55404, United States",
+   replies: [
+     {message: 'Checkpoint at Cedar & 24th, vehicles stopped in both directions'},
+     {message: 'I see them, 4 vehicles, looks like they’re checking IDs', filename: "roadblock.jpg", user: 'a'},
+     {message: 'Northbound only, southbound lane is clear', user: 'a', add: 8},
+     {message: 'My neighbor just drove through, they waved her on, didn’t stop her', user: 'b', add: 22 - 8},
+     {message: 'Still there', user: 'a', add: 1.5 * 60 - 22},
+     {message: 'Legal observer heading over', user: 'b', add: 30},
+     {message: 'Legal observer on site, documenting', user: 'b', add: 30},
+     {message: 'They’re packing up', user: 'a', add: 1.5 * 60},
+     {message: 'All clear, drove past, nobody there', user: 'c', add: 2 * 60}
+   ]},
+  {lat: 44.94876330298185, lng: -93.24740409851076, eventTime: ago(11 * 60), tag: observer, source: 'e',
+   label: "2934, Cedar Avenue South, East Phillips, Phillips, Minneapolis, Hennepin County, Minnesota, 55407, United States",
+   replies: [
+     {message: 'Unmarked white van, Cedar Ave near Lake St, 3 individuals in vests, stationary 30+ min', filename: 'white-van.jpg'},
+     {message: 'Same van was on Franklin yesterday around noon, I got a partial plate', add: 15, user: 'd'},
+     {message: 'MN plates, starts with EF', add: 5, user: 'e'},
+     {message: 'They moved, now parked on 2nd Ave near the halal store', add: 180, user: 'd'},
+     {message: 'Gone from 2nd Ave', add: 3 * 60, user: 'f'},
+     {message: 'FYI someone posted about a similar van last week, different topic', add: 4 * 60, user: 'e'}
+   ]},
+  {lat: 44.944693196058864, lng: -93.25246810913087, eventTime: ago(8 * 60), tag: observer, source: 'g',
+   label: "3201, Bloomington Avenue, Powderhorn Park, Powderhorn, Minneapolis, Hennepin County, Minnesota, 55407, United States",
+   replies: [
+     {message: 'All clear — Bloomington & 32nd presence has dispersed as of 2pm'},
+     {message: 'Confirmed, I walked past just now, nothing there', add: 30, user: 'g'},
+     {message: 'Thanks for posting this, was nervous to go out', add: 90, user: 'h'}
+   ]},
+  {lat: 44.93688628795094, lng: -93.26255321502686, eventTime: ago(6 * 60), tag: observer, source: 'f',
+   label: "3628, Chicago Avenue, Central, Powderhorn, Minneapolis, Hennepin County, Minnesota, 55407, United States", 
+   replies: [
+     {message: 'Door-to-door on Chicago Ave 35th–38th, asking for residents by name'},
+     {message: 'They skipped the businesses, only hitting apartments', add: 5, user: 'b'},
+     {message: 'Two of them, badges visible, clipboards, taking notes', add: 2, user: 'f', filename: 'clipboards.jpg'},
+     {message: 'They moved south past 35th now', add: 5, user: 'b'},
+     {message: 'Haven’t seen them since, might be done for today', add: 30, user: 'f'}
+   ]},
+  {lat: 44.93396981648836, lng: -93.2772731781006, eventTime: ago(1 * 60), tag: observer, source: 'c',
+   label: "Thrive PrEP Clinic, 17, East 38th Street, King Field, Southwest, Minneapolis, Hennepin County, Minnesota, 55409, United States",
+   replies: [
+     //{message: 'Vehicle matching earlier description seen near Nicollet & 38th'}
+   ]},
+  {lat: 44.92728567738864, lng: -93.27740192413331, eventTime: ago(20), tag: observer, source: 'd',
+   label: "38, East 42nd Street, King Field, Southwest, Minneapolis, Hennepin County, Minnesota, 55409, United States",
+   replies: [
     //{message: 'Two people in suits photographing building entrances, Nicollet & 42nd'}
   ]},
 
-  {lat: 44.95596121834308, lng: -93.26585769653322, eventTime: ago(13 * 60), tag: utility, source: 'x', replies: [
-    {message: 'Water main break at Park Ave & 26th, avoid area, road flooded', filename: 'water-main.jpg'},
-    {message: 'Road is completely flooded, bus rerouted', add: 15, user: 'x'},
-    {message: 'City crew is here working on it', add: 3 * 60 - 15, user: 'y'},
-    {message: 'Fixed overnight, road is open but still wet', add: 10 * 60 - 2, user: 'x'}
-  ]},
-  {lat: 44.92698183440127, lng: -93.26753139495851, eventTime: ago(60), tag: utility, source: 'z', replies: [
-    {message: 'Power outage affecting blocks around Portland & 42nd, Xcel aware'},
-    {message: 'Xcel says estimated restore 6pm', add: 45, user: 'z'}
-  ]},
+  {lat: 44.95596121834308, lng: -93.26585769653322, eventTime: ago(13 * 60), tag: utility, source: 'x',
+   label: "Oakland Av S, East 26th Street, Phillips West, Phillips, Minneapolis, Hennepin County, Minnesota, 55467, United States",
+   replies: [
+     {message: 'Water main break at Park Ave & 26th, avoid area, road flooded', filename: 'water-main.jpg'},
+     {message: 'Road is completely flooded, bus rerouted', add: 15, user: 'x'},
+     {message: 'City crew is here working on it', add: 3 * 60 - 15, user: 'y'},
+     {message: 'Fixed overnight, road is open but still wet', add: 10 * 60 - 2, user: 'x'}
+   ]},
+  {lat: 44.92698183440127, lng: -93.26753139495851, eventTime: ago(60), tag: utility, source: 'z',
+   label: "4155, Portland Avenue, Bryant, Powderhorn, Minneapolis, Hennepin County, Minnesota, 55407, United States",
+   replies: [
+     {message: 'Power outage affecting blocks around Portland & 42nd, Xcel aware'},
+     {message: 'Xcel says estimated restore 6pm', add: 45, user: 'z'}
+   ]},
 
-  {lat: 44.94645302117303, lng: -93.2659435272217, eventTime: ago(4 * 60), tag: community, source: 'j', replies: [
-    {message: "Free winter coats + hot food, All God's Children Church parking lot until 4pm", filename: 'coats.jpg'},
-    {message: 'Do they have kids sizes?', add: 5, user: 'i'},
-    {message: 'Yes! tons of kids coats, also hats and gloves', add: 7, user: 'j'},
-    {message: 'There’s a line but it’s moving fast', add: 18, user: 'j'},
-    {message: 'They also have diapers and formula, didn’t see that in the post', add: 30, user: 'k'},
-    {message: 'Coats are running low, still have food', add: 60, user: 'j'},
-    {message: 'They’re packing up, said they’ll be back next Saturday same time', add: 110, user: 'k'}
-  ]},
+{lat: 44.94645302117303, lng: -93.2659435272217, eventTime: ago(4 * 60), tag: community, source: 'j',
+ label: "3100, Park Avenue, Central, Powderhorn, Minneapolis, Hennepin County, Minnesota, 55407, United States",
+ replies: [
+   {message: "Free winter coats + hot food, All God's Children Church parking lot until 4pm", filename: 'coats.jpg'},
+   {message: 'Do they have kids sizes?', add: 5, user: 'i'},
+   {message: 'Yes! tons of kids coats, also hats and gloves', add: 7, user: 'j'},
+   {message: 'There’s a line but it’s moving fast', add: 18, user: 'j'},
+   {message: 'They also have diapers and formula, didn’t see that in the post', add: 30, user: 'k'},
+   {message: 'Coats are running low, still have food', add: 60, user: 'j'},
+   {message: 'They’re packing up, said they’ll be back next Saturday same time', add: 110, user: 'k'}
+ ]},
 
   // Fire
   {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fireTest},
