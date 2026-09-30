@@ -268,6 +268,7 @@ async function publishAlert({lat, lng, // location on the globe
     if (publishInParallel) return (await Promise.all(cells.map(p1)))[0];
     let alertIdentifier;
     for (const cell of cells) alertIdentifier = await p1(cell);
+    return alertIdentifier;
   }
   const alertIdentifier = await pubAllCells({payload: label ? {lat, lng, label} : {lat, lng}, source, issuedTime: eventTime, hashtag: topicWithDefaultIcon});
   const first = replies[0];

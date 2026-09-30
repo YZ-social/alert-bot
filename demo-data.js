@@ -153,17 +153,17 @@ export const demoData = [
      {message: 'Xcel says estimated restore 6pm', add: 45, user: 'z'}
    ]},
 
-{lat: 44.94645302117303, lng: -93.2659435272217, eventTime: ago(4 * 60), tag: community, source: 'j',
- label: "3100, Park Avenue, Central, Powderhorn, Minneapolis, Hennepin County, Minnesota, 55407, United States",
- replies: [
-   {message: "Free winter coats + hot food, All God's Children Church parking lot until 4pm", filename: 'coats.jpg'},
-   {message: 'Do they have kids sizes?', add: 5, user: 'i'},
-   {message: 'Yes! tons of kids coats, also hats and gloves', add: 7, user: 'j'},
-   {message: 'There’s a line but it’s moving fast', add: 18, user: 'j'},
-   {message: 'They also have diapers and formula, didn’t see that in the post', add: 30, user: 'k'},
-   {message: 'Coats are running low, still have food', add: 60, user: 'j'},
-   {message: 'They’re packing up, said they’ll be back next Saturday same time', add: 110, user: 'k'}
- ]},
+  {lat: 44.94645302117303, lng: -93.2659435272217, eventTime: ago(4 * 60), tag: community, source: 'j',
+   label: "3100, Park Avenue, Central, Powderhorn, Minneapolis, Hennepin County, Minnesota, 55407, United States",
+   replies: [
+     {message: "Free winter coats + hot food, All God's Children Church parking lot until 4pm", filename: 'coats.jpg'},
+     {message: 'Do they have kids sizes?', add: 5, user: 'i'},
+     {message: 'Yes! tons of kids coats, also hats and gloves', add: 7, user: 'j'},
+     {message: 'There’s a line but it’s moving fast', add: 18, user: 'j'},
+     {message: 'They also have diapers and formula, didn’t see that in the post', add: 30, user: 'k'},
+     {message: 'Coats are running low, still have food', add: 60, user: 'j'},
+     {message: 'They’re packing up, said they’ll be back next Saturday same time', add: 110, user: 'k'}
+   ]},
 
   // Fire
   {lat: 37.453500359600035, lng: -122.27911949157715, eventTime: ago(1000), tag: fireTest},

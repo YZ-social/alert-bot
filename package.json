@@ -1,13 +1,13 @@
 {
   "name": "alert-bot",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Adds data to civildefense.io.",
   "scripts": {
     "start": "node ./index.js",
     "build": "node stationData.js",
     "repoint-axona": "pushd node_modules/@yz-social/civildefense.io; npm link ../../../../axona-protocol; npm ls; popd",
-    "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://testnet.axona.net' node server/app.js --nPortals 3 &); popd",
-    "mainnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://bridge.axona.net' node server/app.js --nPortals 3 &); popd",    
+    "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://testnet.axona.net' node server/app.js --nPortals 6 &); popd",
+    "mainnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://bridge.axona.net' node server/app.js --nPortals 6 &); popd",   
     "basic-mainnet-check": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://bridge.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --includeImages false --tags floodTest fireTest iceTest",
     "basic-testnet-check": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --includeImages false --tags floodTest fireTest iceTest",
     "basic-testnet-diagnostics": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --verbose --logConnectivity --lookupFailedTopics --metricsS 20 --includeImages false --tags floodTest fireTest iceTest",
@@ -30,7 +30,7 @@
   "author": "howard.stearns@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "@yz-social/civildefense.io": "^5.2.0",
+    "@yz-social/civildefense.io": "^5.3.0",
     "image-to-uri": "^1.0.0",
     "s2js": "^1.44.0",
     "yargs": "^18.0.0"
