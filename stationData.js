@@ -48,7 +48,7 @@ const audioMap = {
   // pls: 'audio/x-scpls' // Players gotta play
 }
 
-function tick(string = ".") { // If info, lock string without newlines.
+function tick(string = ".") { // If info, log string without newlines.
   if (!info) return;
   process.stdout.write(string);
 }

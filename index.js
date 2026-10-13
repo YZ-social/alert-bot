@@ -373,8 +373,16 @@ if (canonicalTags.includes('fire')) {
 for (const key of Object.keys(users)) {
   const {handle, avatar, identity, regions = []} = users[key];
   const issuedTime = Date.now();
-  for (const region of regions) {
+  if (regions.length) { // I.e., used at all.
+  //for (const region of regions) {
     const owner = identity.authorId;
+
+      // Currently, we reproduce the work of Agent.homeRegion rather than calling it, in order to not confuse axona bot-developers.
+      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
+      const bytes = new Uint8Array(hash);
+      const rawCode = bytes[0]; // hash is distributed uniformly, so it doesn't matter which we take.
+      const region = rawCode < 0xcf ? rawCode : rawCode & 0x3f; // Wrap around when we get to reserved regions.
+
     if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
     if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
   }
