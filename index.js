@@ -332,10 +332,10 @@ for (const code of await readdir(streamingRootPath)) {
     const dataModule = await import(path, {with: { type: 'json' }})
 	  .catch(_ => {return {default: []};}); // Not all styles are present.
     for (const station of dataModule.default) {
-      const {lat, lng, name, url, mime, homepage} = station;
+      const {lat, lng, name, url, mime, homepage, favicon} = station;
       const title = new URL(homepage).host.replace(/^www\./, '');
       const msgId = await publishAlert({lat, lng, label:title, topicWithDefaultIcon: extended, replies: [
-	{message: `${name} ${homepage} ${url}`, user: 'RadioBrowser'}
+	{message: `<a href="${homepage}" target="_blank"><h3>${name}</h3></a> <audio controls><source src="${url}" type="${mime}" /></audio>`, user: 'RadioBrowser'}
       ]});
     }
   }

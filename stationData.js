@@ -66,7 +66,7 @@ async function safeFetch(url) { // fetch(url), but instead of throwing, log the 
   return response;
 }
 
-const homepages = new Set(); // For dedupping.
+const dedupes = new Set(); // For dedupping.
 export async function fetchStations(styles) {
   const start = Date.now();
   const codesData = {}; // Maps Axon code => {[style], [stationData...]}
@@ -93,13 +93,21 @@ export async function fetchStations(styles) {
       const response = await safeFetch(apiUrl.toString());
       if (!response) break;
       data = await response.json();
-      for (const {geo_lat, geo_long, name, url, homepage, favicon} of data) {
+      for (const {geo_lat, geo_long, name, url, homepage, favicon, state} of data) {
 	if (!geo_lat || !geo_long || !homepage) continue;
-	if (homepages.has(homepage)) continue; // Dedupe by homepage.
-	const mime = audioMap[extname(url).replace(/^\./, '')];
-	if (!mime) continue;
-	if (!(await safeFetch(url))) continue;
-	homepages.add(homepage);
+	if (dedupes.has(url)) continue;
+	dedupes.add(url);
+	const domain = new URL(homepage).hostname.replace('^www\.', '');
+	const report = message => console.warn(`${url} (${domain}/${state}): ${message}`);
+	const stream = await fetch(url, {method: 'HEAD'}).catch(e => report(e.message));
+	if (!stream) continue;
+	if (!stream.ok) { report(stream.statusText); continue; }
+	let mime = stream.headers.get('Content-Type');
+	let divider = (mime || '').indexOf(';');
+	if (divider >= 0) mime = mime.slice(0, divider);
+
+	const types = ['audio/mpeg', 'audio/aac', 'audio/aacp', 'audio/ogg', 'application/ogg', 'audio/mp4', 'audio/x-mpegurl', 'application/x-mpegurl', 'application/dash+xml', 'video/mp4', 'application/vnd.apple.mpegurl'];
+	if (!mime || !types.includes(mime.toLowerCase())) { report(`bad MIME type '${mime}'`); continue; }
 	const lat = parseFloat(geo_lat);
 	const lng = parseFloat(geo_long);
 	const code = P2PWebNetwork.regionCode(lat, lng).toString(16).padStart(2, '0');
