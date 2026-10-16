@@ -99,6 +99,7 @@ export async function fetchStations(styles) {
 	dedupes.add(url);
 	const domain = new URL(homepage).hostname.replace('^www\.', '');
 	const report = message => console.warn(`${url} (${domain}/${state}): ${message}`);
+	if (url.startsWith('http://')) { report('Cannot use non-TLS url.'); continue; }
 	const stream = await fetch(url, {method: 'HEAD'}).catch(e => report(e.message));
 	if (!stream) continue;
 	if (!stream.ok) { report(stream.statusText); continue; }
