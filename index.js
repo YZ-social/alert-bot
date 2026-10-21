@@ -220,9 +220,11 @@ const topics = {}; // Map topic JSON string => {nPublished, isChunk, run1: {nRec
 function countTopic(topic, msgIds) {
   const topicKey = JSON.stringify(topic);
   const isChunk = Array.isArray(msgIds);
-  const data = topics[topicKey] ??= {nPublished: 0, isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0}, run2: {nReceivedKill: 0, nReceivedPub: 0}};
+  const data = topics[topicKey] ??= {nPublished: 0, published: new Set(), isChunk, run1: {nReceivedKill: 0, nReceivedPub: 0, received: new Set()}, run2: {nReceivedKill: 0, nReceivedPub: 0, received: new Set()}};
   data.nPublished += 1;
   totalPublications += isChunk ? msgIds.length : 1;
+  if (isChunk) data.published.add(...msgIds);
+  else data.published.add(msgIds);
   if (!metricsS || data.metrics) return;
   setTimeout(() => data.metrics = networkNode.peer.metrics(topic)
 	     .then(metrics => {
@@ -410,9 +412,13 @@ if (!dryRun && subTimeoutS) {
       const {name, region, owner} = JSON.parse(topicString);
       const topicData = topics[topicString];
       const {promise, resolve} = Promise.withResolvers();
-      const handler = ({deleted}) => {
+      const handler = ({deleted, tag, topic}) => {
 	if (deleted) topicData[key].nReceivedKill++;
-	else topicData[key].nReceivedPub++;
+	else if (topicData.published.has(tag)) {
+	  topicData[key].nReceivedPub++;
+	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', {topic, tag});
+	  topicData[key].received.add();
+	}
 	debug(key, deleted ? 'deleted' : 'received', topicString, topicData);
 	if (topicData[key].nReceivedPub >= topicData.nPublished) resolve();
       };
