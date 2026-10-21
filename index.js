@@ -379,7 +379,7 @@ for (const key of Object.keys(users)) {
   //for (const region of regions) {
     const owner = identity.authorId;
 
-      // Currently, we reproduce the work of Agent.homeRegion rather than calling it, in order to not confuse axona bot-developers.
+      // If we define a single home region for each agent.
       const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
       const bytes = new Uint8Array(hash);
       const rawCode = bytes[0]; // hash is distributed uniformly, so it doesn't matter which we take.
@@ -413,11 +413,12 @@ if (!dryRun && subTimeoutS) {
       const topicData = topics[topicString];
       const {promise, resolve} = Promise.withResolvers();
       const handler = ({deleted, tag, topic}) => {
-	if (deleted) topicData[key].nReceivedKill++;
+	if (topicData.isChunk) topicData[key].nReceivedPub++;
+	else if (deleted) topicData[key].nReceivedKill++;
 	else if (topicData.published.has(tag)) {
 	  topicData[key].nReceivedPub++;
 	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', {topic, tag});
-	  topicData[key].received.add();
+	  topicData[key].received.add(tag);
 	}
 	debug(key, deleted ? 'deleted' : 'received', topicString, topicData);
 	if (topicData[key].nReceivedPub >= topicData.nPublished) resolve();
