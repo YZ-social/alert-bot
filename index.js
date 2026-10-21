@@ -44,7 +44,11 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Include any image attachments that may be in the data."
       })
-
+      .option('agentHome', {
+	type: 'boolean',
+	default: false,
+	description: "Publish agent metadata to a single computable home region per agent. (False means to copy data to each region the agent publishes in.)"
+      })
       .option('baseURL', {
 	type: 'string',
 	default: 'https://civildefense.io/',
@@ -126,7 +130,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHome, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 const canonicalTags = tags.map(tag => canonicalTag(tag));
 
@@ -373,18 +377,17 @@ if (canonicalTags.includes('fire')) {
 
 // Publish the handle/avatar for each reporting user.
 for (const key of Object.keys(users)) {
-  const {handle, avatar, identity, regions = []} = users[key];
+  let {handle, avatar, identity, regions = []} = users[key];
+  const owner = regions.length && identity.authorId;
+  if (regions.length && agentHome) { // If we define a single home region for each agent.
+    const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
+    const bytes = new Uint8Array(hash);
+    const rawCode = bytes[0]; // hash is distributed uniformly, so it doesn't matter which we take.
+    const region = rawCode < 0xcf ? rawCode : rawCode & 0x3f; // Wrap around when we get to reserved regions.
+    regions = [region];
+  }
   const issuedTime = Date.now();
-  if (regions.length) { // I.e., used at all.
-  //for (const region of regions) {
-    const owner = identity.authorId;
-
-      // If we define a single home region for each agent.
-      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
-      const bytes = new Uint8Array(hash);
-      const rawCode = bytes[0]; // hash is distributed uniformly, so it doesn't matter which we take.
-      const region = rawCode < 0xcf ? rawCode : rawCode & 0x3f; // Wrap around when we get to reserved regions.
-
+  for (const region of regions) {
     if (handle) await publish({eventName: agentTopic('handle', owner), region, owner, payload: handle, issuedTime, source: key});
     if (avatar && includeImages) await publish({eventName: agentTopic('avatar', owner), region, owner, payload: imageToUri(`./images/${avatar}`), issuedTime, source: key});
   }
