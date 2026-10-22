@@ -29,6 +29,12 @@ const argv = yargs(hideBin(process.argv))
 	type: 'array', string: true,
 	description: "Restrict publication to these hex-code regions. (Empty means no restriction.)"
       })
+      .option('fireScope', {
+	type: 'string',
+	default: 'none',
+	choices: ['none', 'us', 'world'],
+	description: "What map should be used for fire data. If not 'none', adds fire to tags."
+      })
       .option('kill', {
 	type: 'boolean',
 	default: true,
@@ -130,9 +136,11 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHome, dryRun} = argv; // yargs puts values in argv.
+let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHome, fireScope, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
-const canonicalTags = tags.map(tag => canonicalTag(tag));
+let canonicalTags = tags.map(tag => canonicalTag(tag));
+if (fireScope === 'none') canonicalTags = canonicalTags.filter(tag => tag !== 'fire');
+else if (!canonicalTags.includes('fire')) canonicalTags.push('fire');
 
 function log(...rest) { // If info, log args (with newline at end).
   if (!info && !verbose) return;
@@ -350,8 +358,9 @@ for (const code of await readdir(streamingRootPath)) {
 // NASA FIRMS Fire Data
 if (canonicalTags.includes('fire')) {
   await saveUrlToFile(
-    //'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
-    'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
+    fireScope === 'us' ?
+      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
+      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
     'fire.csv');
   const response = await open('fire.csv').catch(console.error);
   if (response) {
@@ -407,7 +416,7 @@ if (!dryRun && subTimeoutS) {
     blankLine();
     await pause`Waiting ${pauseBeforeRestartS} seconds before ${networkNode ? 'confirming' : 'creating new node to confirm'} delivery for ${key}.`;
     if (!networkNode) networkNode = await create();
-      await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this node.`;
+    await pause`Waiting ${pauseBeforeSubscribeS} seconds before subscribing with this node.`;
     const topicStrings = Object.keys(topics);
     log(`Subscribing to ${topicStrings.length} topics${subStaggerMs ? ` (staggered ${subStaggerMs}ms apart)` : ''}.`);
     const receivedAll = [];
@@ -470,6 +479,7 @@ if (!dryRun && subTimeoutS) {
   }
   await check('run1');
   subTimeoutS *= 2;
+  pauseBeforeSubscribeS *= 2;
   await check('run2');
   blankLine();
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
