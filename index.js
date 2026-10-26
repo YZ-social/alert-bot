@@ -32,7 +32,7 @@ const argv = yargs(hideBin(process.argv))
       .option('fireScope', {
 	type: 'string',
 	default: 'none',
-	choices: ['none', 'us', 'world'],
+	choices: ['none', 'us', 'world', 'reuse-previous'],
 	description: "What map should be used for fire data. If not 'none', adds fire to tags."
       })
       .option('kill', {
@@ -357,20 +357,26 @@ for (const code of await readdir(streamingRootPath)) {
 
 // NASA FIRMS Fire Data
 if (canonicalTags.includes('fire')) {
-  await saveUrlToFile(
-    fireScope === 'us' ?
-      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
-      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
-    'fire.csv');
+  if (fireScope !== 'reuse-previous') {
+    await saveUrlToFile(
+      fireScope === 'us' ?
+	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
+	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
+      'fire.csv');
+  }
   const response = await open('fire.csv').catch(console.error);
   if (response) {
     const cutoff = Date.now() - 24 * 60 * 60e3;
     let skipped = 0, counted = 0;
-    for await (const line of response.readLines()) { // readLines(response)) {
+    for await (const line of response.readLines()) {
       if (line.startsWith('latitude')) continue;
       const [latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight] = line.split(',');
       if (confidence === 'low') continue;
       //if (confidence !== 'high') continue
+      if (regions) {
+	const region = P2PWebNetwork.regionCode(latitude, longitude).toString(16);
+	if (!regions.includes(region)) continue;
+      }
       const eventTime = new Date(`${acq_date}T${acq_time.slice(0, 2)}:${acq_time.slice(2)}Z`).getTime();
       if (eventTime < cutoff) {
 	console.log('skipping expired event', new Date(eventTime));
