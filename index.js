@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import process from 'node:process';
 import { readdir, open, rm, appendFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -357,9 +358,9 @@ for (const code of await readdir(streamingRootPath)) {
 
 // NASA FIRMS Fire Data
 if (canonicalTags.includes('fire')) {
-  if (fireScope !== 'reuse-previous') {
+  if ((fireScope !== 'reuse-previous') || !existsSync('fire.csv')) {
     await saveUrlToFile(
-      fireScope === 'us' ?
+      fireScope !== 'world' ?
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
       'fire.csv');
@@ -504,5 +505,7 @@ if (!dryRun && subTimeoutS) {
   }
   blankLine();
   log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events (of which ${nDeviations} failures are different between run1 and run2), from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
+  if (nPubFails || nKillFails) process.exit(1);
 }
 log('Done.');
+process.exit(0); // In case there's something holding us open.
