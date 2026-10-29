@@ -6,7 +6,7 @@ import { EOL } from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { demoData, users, styles as demoStyles, ago, fire } from './demo-data.js';
-import { dht, P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig } from '@yz-social/civildefense.io';
+import { dht, P2PWebNetwork, agentTopic, alertTopic, canonicalTag, getContainingCells, location, deriveTopicIdBig, geoCellCenter } from '@yz-social/civildefense.io';
 import {styles as radioStyles, streamingRootPath } from './common.js';
 import { saveUrlToFile } from './utils.js';
 const imageToUri = (await import('image-to-uri')).default;
@@ -51,15 +51,15 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Include any image attachments that may be in the data."
       })
-      .option('agentHome', {
+      .option('agentHomes', {
 	type: 'boolean',
 	default: false,
 	description: "Publish agent metadata to a single computable home region per agent. (False means to copy data to each region the agent publishes in.)"
       })
-      .option('baseURL', {
+      .option('pubHome', {
 	type: 'string',
-	default: 'https://civildefense.io/',
-	description: "The base URL where the results can be reached, for generating inspection URLs."
+	default: '',
+	description: "Overrides the home location of the node doing the publications and checking, as a hex region code. If not specified, the local default is used per civildefense.io/server/getLocation."
       })
       .option('info', {
 	alias: 'i',
@@ -101,7 +101,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('disconnectAfterPublish', {
 	type: 'boolean',
-	default: true,
+	default: false,
 	description: "Whether to disconnect the publisher before running confirmations. (Otherwise disconnects at exit.)"
       })
       .option('subTimeoutS', {
@@ -137,7 +137,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {baseURL, info, verbose, logConnectivity, tags, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHome, fireScope, dryRun} = argv; // yargs puts values in argv.
+let {info, verbose, logConnectivity, tags, pubHome, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHomes, fireScope, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 let canonicalTags = tags.map(tag => canonicalTag(tag));
 if (fireScope === 'none') canonicalTags = canonicalTags.filter(tag => tag !== 'fire');
@@ -171,17 +171,16 @@ function pause(strings, ...values) { // E.g.: pause`Pausing for ${pauseBeforePub
   return delay;
 }
 
-const url = new URL('/', baseURL)
-const params = url.searchParams;
 function makeURL({alertIdentifier, lat, lng, tag}) {
+  const params = new URLSearchParams()
   params.set('lat', lat);
   params.set('lng', lng);
   params.set('alert', alertIdentifier);
   params.set('tags', encodeURIComponent(tag));
-  return url.href;
+  return `/?${params.toString()}`;
 }
 function create() {
-  return P2PWebNetwork.create({location, infoLogger: info && log, debugLogger: verbose && debug});
+  return P2PWebNetwork.create({location: pubHome ? geoCellCenter(parseInt(pubHome, 16)) : location, infoLogger: info && log, debugLogger: verbose && debug});
 }
 
 // Create a p2p node and connect to the YZ network.
@@ -318,7 +317,7 @@ async function publishAlert({lat, lng, // location on the globe
   }
   totalAlerts++;
   if (!info) return;
-  log(makeURL({alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
+  log(totalAlerts, makeURL({alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
 
 await pause`Waiting ${pauseBeforePublishS} seconds before publishing.`;
@@ -395,7 +394,7 @@ if (canonicalTags.includes('fire')) {
 for (const key of Object.keys(users)) {
   let {handle, avatar, identity, regions = []} = users[key];
   const owner = regions.length && identity.authorId;
-  if (regions.length && agentHome) { // If we define a single home region for each agent.
+  if (regions.length && agentHomes) { // If we define a single home region for each agent.
     const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
     const bytes = new Uint8Array(hash);
     const rawCode = bytes[0]; // hash is distributed uniformly, so it doesn't matter which we take.
