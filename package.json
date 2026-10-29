@@ -5,18 +5,27 @@
   "scripts": {
     "start": "node ./index.js",
     "build": "node stationData.js",
-    "repoint-axona": "pushd node_modules/@yz-social/civildefense.io; npm link ../../../../axona-protocol; npm ls; popd",
+
+    "localhost-stop-bridge": "pkill node",
+    "localhost-stop-cd": "pushd `node pkgdir.js @yz-social/civildefense.io`; npm stop; popd",
+    "localhost-stop-all": "npm run localhost-stop-cd; npm run localhost-stop-bridge; rm -f killCache.txt",
+    "localhost-wipe": "BRIDGE_URL='ws://localhost:8080' npm start -- --pubHome 47 --tags none",
+    "localhost-bridge": "pushd `node pkgdir.js axona-bridge`; (BRIDGE_REGION_LABEL= BRIDGE_REGION=bridge npm start &); popd; sleep 3",
+    "localhost-hosts": "REGIONS=1 PER=9 PORTALS=$((REGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (BRIDGE_URL='ws://localhost:8080' npm start -- --regionsStart 80 --excludedRegions 81 84 --perRegionCount ${PER} --nPortals ${PORTALS} &); popd; sleep ${SLEEP}",
+    "localhost-start": "npm run localhost-bridge; npm run localhost-hosts",
+    "localhost-check": "BRIDGE_URL='ws://localhost:8080' npm start -- --pubHome 47 --regions 80 --fireScope reuse-previous",
+    "localhost-oneshot": "npm run localhost-start; npm run localhost-check && npm run localhost-stop-all",
+
     "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://testnet.axona.net' npm start -- --nPortals 6 &); popd",
     "mainnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://bridge.axona.net' npm start -- --nPortals 6 &); popd",
     "testnet-check-80": "LAT_LNG='40,-75' BRIDGE_URL='wss://testnet.axona.net' npm start -- --disconnectAfterPublish false --regions 80 --fireScope reuse-previous",
-    "testnet-oneshot-80": "npm run testnet-0x80; sleep 120; npm run testnet-check-80 && (npm run testnet-wipe-last; echo FINISHED; npm stop; npm stop)",
     "basic-mainnet-check": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://bridge.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --includeImages false --tags floodTest fireTest iceTest",
     "basic-testnet-check": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --includeImages false --tags floodTest fireTest iceTest",
     "basic-testnet-diagnostics": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --verbose --logConnectivity --lookupFailedTopics --metricsS 20 --includeImages false --tags floodTest fireTest iceTest",
     "basic-mainnet-diagnostics": "EVENT_VERSION=`date -Iseconds` LAT_LNG=\"40,-75\" BRIDGE_URL=\"wss://bridge.axona.net\" npm start -- --subStaggerMs 200 --disconnectAfterPublish false --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseAfterPublishS 20 --verbose --logConnectivity --lookupFailedTopics --metricsS 20 --includeImages false --tags floodTest fireTest iceTest",
     "mainnet-wipe-last": "BRIDGE_URL=\"wss://bridge.axona.net\" npm start -- --tags none",
     "testnet-wipe-last": "BRIDGE_URL=\"wss://testnet.axona.net\" npm start -- --tags none",
-    "stop": "pkill axona- yz.social"
+    "stop": "pkill yz.social"
   },
   "exports": {
     ".": "./index.js"
@@ -32,7 +41,9 @@
   "author": "howard.stearns@gmail.com",
   "license": "MIT",
   "dependencies": {
+    "@axona/protocol": "github:axona-net/axona-protocol#semver:^4.125.0",
     "@yz-social/civildefense.io": "^5.4.13",
+    "axona-bridge": "github:axona-net/axona-bridge",
     "image-to-uri": "^1.0.0",
     "s2js": "^1.44.0",
     "yargs": "^18.0.0"
