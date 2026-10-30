@@ -5,11 +5,12 @@ A NodeJS script to publish to the YZ network.
 1. Install NodeJS from [nodejs.org](https://nodejs.org/). We tend to use a recent "LTS" (Long-Term Support) version rather than the very latest.
 2. Get this code, e.g., `git clone https://github.com/YZ-social/alert-bot.git`, then `cd alert-bot`.
 3. Install dependencies, e.g., `npm install`.
-... complete instructions for various purposes. Below is just the testing...
+
+... TODO: complete instructions for various purposes. Below is just the testing...
 
 # Test Setup
 
-alert-bot makes use of @xy-social/civildefense.io, @axona/protocol, and axona-bridge. An `npm install` from the alert-bot directory should work, but it is desirable to not have multiple copies of the various dependencies and to be able to alter them between runs of the tests. 
+alert-bot makes use of `@xy-social/civildefense.io`, `@axona/protocol`, and `axona-bridge`. An `npm install` from the alert-bot directory should work, but it is desirable to not have multiple copies of the various dependencies and to be able to alter them between runs of the tests. 
 
 For this purpose, I use npm workspaces. I have an yz directory that has a git clone of alert-bot and each of the above three as subdirectories:
 ```
@@ -21,7 +22,7 @@ yz
   axona-protocol  # https://github.com/axona-net/axona-protocol.git
 ```  
 
-where xy.page.json is:
+where xy/package.json is:
 ```
 {
   "name": "yz",
