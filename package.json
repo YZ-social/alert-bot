@@ -6,7 +6,7 @@
     "start": "node ./index.js",
     "build": "node stationData.js",
 
-    "localhost-stop-bridge": "pkill node",
+    "localhost-stop-bridge": "pkill -9 node",
     "localhost-stop-cd": "pushd `node pkgdir.js @yz-social/civildefense.io`; npm stop; popd",
     "localhost-stop-all": "npm run localhost-stop-cd; npm run localhost-stop-bridge; rm -f killCache.txt",
     "localhost-wipe": "BRIDGE_URL='ws://localhost:8080' npm start -- --pubHome 47 --tags none",
@@ -14,7 +14,8 @@
     "localhost-hosts": "REGIONS=1 PER=9 PORTALS=$((REGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (BRIDGE_URL='ws://localhost:8080' npm start -- --regionsStart 80 --excludedRegions 81 84 --perRegionCount ${PER} --nPortals ${PORTALS} &); popd; sleep ${SLEEP}",
     "localhost-start": "npm run localhost-bridge; npm run localhost-hosts",
     "localhost-check": "BRIDGE_URL='ws://localhost:8080' npm start -- --pubHome 47 --regions 80 --fireScope reuse-previous",
-    "localhost-oneshot": "npm run localhost-start; npm run localhost-check && npm run localhost-stop-all",
+    "localhost-oneshot": "npm run localhost-start; npm run localhost-check && npm run localhost-stop-all", 
+    "localhost-twoshot": "npm run localhost-start; npm run localhost-check && npm run localhost-check && npm run localhost-stop-all",   
 
     "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://testnet.axona.net' npm start -- --nPortals 6 &); popd",
     "mainnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' BRIDGE_URL='wss://bridge.axona.net' npm start -- --nPortals 6 &); popd",
