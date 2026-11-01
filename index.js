@@ -61,6 +61,11 @@ const argv = yargs(hideBin(process.argv))
 	default: '',
 	description: "Overrides the home location of the node doing the publications and checking, as a hex region code. If not specified, the local default is used per civildefense.io/server/getLocation."
       })
+      .option('bridgeUrl', {
+	type: 'string',
+	default: 'wss://bridge.axona.net',
+	description: "Has anyone seen the bridge?"
+      })
       .option('info', {
 	alias: 'i',
 	type: 'boolean',
@@ -137,7 +142,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {info, verbose, logConnectivity, tags, pubHome, regions, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHomes, fireScope, dryRun} = argv; // yargs puts values in argv.
+let {info, verbose, logConnectivity, tags, pubHome, regions, bridgeUrl, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHomes, fireScope, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 let canonicalTags = tags.map(tag => canonicalTag(tag));
 if (fireScope === 'none') canonicalTags = canonicalTags.filter(tag => tag !== 'fire');
@@ -180,7 +185,7 @@ function makeURL({alertIdentifier, lat, lng, tag}) {
   return `/?${params.toString()}`;
 }
 function create() {
-  return P2PWebNetwork.create({location: pubHome ? geoCellCenter(parseInt(pubHome, 16)) : location, infoLogger: info && log, debugLogger: verbose && debug});
+  return P2PWebNetwork.create({location: pubHome ? geoCellCenter(parseInt(pubHome, 16)) : location, infoLogger: info && log, debugLogger: verbose && debug, bridgeUrl});
 }
 
 // Create a p2p node and connect to the YZ network.
@@ -317,7 +322,7 @@ async function publishAlert({lat, lng, // location on the globe
   }
   totalAlerts++;
   if (!info) return;
-  log(totalAlerts, makeURL({alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
+  log(totalAlerts,  P2PWebNetwork.regionCode(lat, lng).toString(16), makeURL({alertIdentifier, lat, lng, tag: topicWithDefaultIcon}));
 }
 
 await pause`Waiting ${pauseBeforePublishS} seconds before publishing.`;
@@ -434,8 +439,8 @@ if (!dryRun && subTimeoutS) {
 	if (topicData.isChunk) topicData[key].nReceivedPub++;
 	else if (deleted) topicData[key].nReceivedKill++;
 	else if (topicData.published.has(tag)) {
-	  topicData[key].nReceivedPub++;
-	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', {topic, tag});
+	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', topic.region.toString(16), topic.name, tag.slice(0, 30));
+	  else topicData[key].nReceivedPub++;
 	  topicData[key].received.add(tag);
 	}
 	debug(key, deleted ? 'deleted' : 'received', topicString, topicData);
