@@ -87,6 +87,18 @@ export const demoData = [
   // {lat: 37.779415530931715, lng: -122.4158960580826, tag: restroom}, // Fulton Plaza/
   // {lat: 37.787553576232526, lng: -122.40743368864061, tag: restroom}, // Union Square
 
+  // {lat: 37.05507923939151, lng: -122.01622960277226, tag: fireTest, source: 'a', eventTime: ago(13 * 60)},
+  // {lat: 37.05058548399626, lng: -122.00747877359393, tag: fireTest, source: 'a', eventTime: ago(11 * 60)},
+  // {lat: 37.04599786514327, lng: -122.00231552124025, tag: fireTest, source: 'a', eventTime: ago(9 * 60)},
+  // {lat: 37.041613358053695, lng: -121.99888229370119, tag: fireTest, source: 'a', eventTime: ago(7 * 60)},
+  // {lat: 37.035858308204595, lng: -121.99510574340822, tag: fireTest, source: 'a', eventTime: ago(5 * 60)},
+  // {lat: 37.03133617731239, lng: -121.98961257934572, tag: fireTest, source: 'a', eventTime: ago(3 * 60)},
+  // {lat: 37.023935745931624, lng: -121.98772430419922, tag: fireTest, source: 'a', eventTime: ago(1 * 60)},
+  // {lat: 37.01749404287767, lng: -121.98514938354494, tag: fireTest, source: 'b', eventTime: ago(4), replies: [
+  //   {message: "I'm seeing smoke just over the hill ⛰️ from here. Anyone know what it is?", user: 'b', add: 1},
+  //   {message: `Yea, it's time to take your _go_ bag!`, filename: 'fire-is-fast-1200w.jpg', user: 'c', add: 2}
+  //  ]},
+
   // Demo script
   // http://civildefense.io/?bridge=wss://testnet.axona.net&tags=%F0%9F%A9%B7%20community%20support%20DEMO,%F0%9F%91%81%EF%B8%8F%20observer%20corps%20DEMO,%F0%9F%A7%B0%20utility%20repairs%20DEMO&lat=44.948797641130824&lng=-93.26159758507859&z=14
   {lat: 44.959116289453725, lng: -93.2473777448331, eventTime: ago(13 * 60), tag: observer, source: 'b',
