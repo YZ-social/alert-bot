@@ -1,6 +1,6 @@
 {
   "name": "alert-bot",
-  "version": "2.4.7",
+  "version": "2.4.8",
   "description": "Adds data to civildefense.io.",
   "scripts": {
     "start": "node ./index.js",
@@ -17,8 +17,8 @@
     "localhost-oneshot": "npm run localhost-start; npm run localhost-check && npm run localhost-stop-all", 
     "localhost-twoshot": "npm run localhost-start; npm run localhost-check && npm run localhost-check && npm run localhost-stop-all",
 
-    "localhost-hosts-us": "NREGIONS=`echo ${REGIONS_ARRAY:-80} | xargs | wc -w` PER=9 PORTALS=$((NREGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (npm start -- --bridgeUrl ws://localhost:8080 --regionsStart `echo ${REGIONS_ARRAY:-80} | awk '{print $1}'` --excludedRegions 81 84 --perRegionCount ${PER} --nPortals ${PORTALS} &); popd; sleep ${SLEEP}",
-    "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ws://localhost:8080 --pubHome 47 --fireScope reuse-previous --regions",
+    "localhost-hosts-us": "NREGIONS=`echo ${REGIONS_ARRAY:-80} | xargs | wc -w` PER=${PER_REGION:-9} PORTALS=$((NREGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --regionsStart `echo ${REGIONS_ARRAY:-80} | awk '{print $1}'` --excludedRegions 81 84 --perRegionCount ${PER} --nPortals ${PORTALS} &); popd; sleep ${SLEEP}",
+    "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 47 --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
     "localhost-oneshot-us": "npm run localhost-bridge; npm run localhost-hosts-us; npm run localhost-check-us && npm run localhost-stop-all",
 
     "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' npm start -- --bridgeUrl ws://testnet.axona.net --nPortals 6 &); popd",
@@ -46,8 +46,8 @@
   "author": "howard.stearns@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "@axona/protocol": "github:axona-net/axona-protocol#semver:^4.125.0",
-    "@yz-social/civildefense.io": "^5.4.13",
+    "@axona/protocol": "github:axona-net/axona-protocol#semver:^4.128.0",
+    "@yz-social/civildefense.io": "^5.4.15",
     "axona-bridge": "github:axona-net/axona-bridge",
     "image-to-uri": "^1.0.0",
     "s2js": "^1.44.0",
