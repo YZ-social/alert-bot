@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import process from 'node:process';
+import { execSync } from 'node:child_process';
 import { readdir, open, rm, appendFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { EOL } from 'node:os';
@@ -41,6 +42,11 @@ const argv = yargs(hideBin(process.argv))
 	default: true,
 	description: "Before publishing, kill the alerts and replies that were published since the last kill, and clear the cache of identifying data in the file system."
       })
+      .option('recordKill', {
+	type: 'boolean',
+	default: true,
+	description: "Record publications for killing next run."
+      })
       .option('dryRun', {
 	type: 'boolean',
 	default: false,
@@ -55,6 +61,11 @@ const argv = yargs(hideBin(process.argv))
 	type: 'boolean',
 	default: false,
 	description: "Publish agent metadata to a single computable home region per agent. (False means to copy data to each region the agent publishes in.)"
+      })
+      .option('topicLimit', {
+	type: 'number',
+	default: 0,
+	description: "If non-zero, specifies the maximum number of publications that should be made to a topic, skipping the rest."
       })
       .option('pubHome', {
 	type: 'string',
@@ -142,7 +153,7 @@ const argv = yargs(hideBin(process.argv))
       .strict()
       .parse();
 
-let {info, verbose, logConnectivity, tags, pubHome, regions, bridgeUrl, kill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHomes, fireScope, dryRun} = argv; // yargs puts values in argv.
+let {info, verbose, logConnectivity, tags, pubHome, regions, bridgeUrl, kill, recordKill, throttleMS, subStaggerMs, subTimeoutS, pauseBeforeDeleteS, pauseBeforePublishS, pauseAfterPublishS, disconnectAfterPublish, lookupFailedTopics, metricsS, pauseBeforeRestartS, pauseBeforeSubscribeS, includeImages, agentHomes, topicLimit, fireScope, dryRun} = argv; // yargs puts values in argv.
 pauseAfterPublishS = Math.max(pauseAfterPublishS, metricsS);
 let canonicalTags = tags.map(tag => canonicalTag(tag));
 if (fireScope === 'none') canonicalTags = canonicalTags.filter(tag => tag !== 'fire');
@@ -229,6 +240,7 @@ if (kill) { // Delete everything that had been recorded in killCache.txt in prev
 }
 
 function recordForKill({eventName, region, owner, killTag, source}) { // Asynchronously add to Record in killCache.txt.
+  if (!recordKill) return;
   return appendFile('killCache.txt', JSON.stringify({eventName, region, owner, killTag, source}) + EOL, 'utf8');
 }
 let totalPublications = 0;
@@ -255,6 +267,18 @@ function record({eventName, region, owner, killTag, source}, msgIds) { // Asynch
 }
 
 async function publish({eventName, region, owner, source, ...options}) { // Publish to network.
+  if (topicLimit) {
+    const topic = {name: eventName, region, owner};
+    const key = JSON.stringify(topic);
+    const data = topics[key];
+    if (data && (data.nPublished >= topicLimit)) {
+      if (!data.notifiedOverLimit) {
+	console.log('*** Skipping over limit on topic on topic', eventName);
+	data.notifiedOverLimit = true;
+      }
+      return null;
+    }
+  }
   const signWith = await getUserIdentity(source, region);
   const msgId = dryRun ? Date.now() : await networkNode.publish({eventName, region, owner, ...options, signWith});
   debug('publish', eventName, region, source, signWith.authorId, msgId);
@@ -284,9 +308,9 @@ async function publishAlert({lat, lng, // location on the globe
   const cells = getContainingCells(lat, lng);
   async function pubAllCells({payload, issuedTime, hashtag, source, alert}) {
     const p1 = cell => publish({eventName: alertTopic(cell, topicKey), region, payload, issuedTime, hashtag, source, alert});
-    if (publishInParallel) return (await Promise.all(cells.map(p1)))[0];
+    if (publishInParallel) return (await Promise.all(cells.map(p1))).find(id => id);
     let alertIdentifier;
-    for (const cell of cells) alertIdentifier = await p1(cell);
+    for (const cell of cells) alertIdentifier = await p1(cell) || alertIdentifier;
     return alertIdentifier;
   }
   const alertIdentifier = await pubAllCells({payload: label ? {lat, lng, label} : {lat, lng}, source, issuedTime: eventTime, hashtag: topicWithDefaultIcon});
@@ -368,12 +392,15 @@ if (canonicalTags.includes('fire')) {
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
       'fire.csv');
+    execSync('tail -r fire.csv > fire.reversed', console.error);
   }
-  const response = await open('fire.csv').catch(console.error);
-  if (response) {
+  // If we're limiting to the first n publications in a topic, we need to reverse the data so that we're using the LAST n,
+  // to get the same effect as a rollover that keeps the last n.
+  const response = await open(topicLimit ? 'fire.reversed' : 'fire.csv').catch(console.error);
+   if (response) {
     const cutoff = Date.now() - 24 * 60 * 60e3;
     let skipped = 0, counted = 0;
-    for await (const line of response.readLines()) {
+     for await (const line of response.readLines()) {
       if (line.startsWith('latitude')) continue;
       const [latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight] = line.split(',');
       if (confidence === 'low') continue;
@@ -388,8 +415,8 @@ if (canonicalTags.includes('fire')) {
 	skipped++;
 	continue;
       }
-      counted++;
       await publishAlert({lat: latitude, lng: longitude, topicWithDefaultIcon: fire, source: 'firms', eventTime});
+      counted++;
     }
     console.log('skipped:', skipped, 'included:', counted);
   }

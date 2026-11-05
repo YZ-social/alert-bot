@@ -5,7 +5,6 @@
   "scripts": {
     "start": "node ./index.js",
     "build": "node stationData.js",
-
     "localhost-stop-bridge": "pkill -9 node || true",
     "localhost-stop-cd": "pushd `node pkgdir.js @yz-social/civildefense.io`; npm stop; popd",
     "localhost-stop-all": "npm run localhost-stop-cd; npm run localhost-stop-bridge; rm -f killCache.txt",
@@ -13,13 +12,17 @@
     "localhost-bridge": "pushd `node pkgdir.js axona-bridge`; (BRIDGE_REGION_LABEL= BRIDGE_REGION=bridge npm start &); popd; sleep 3",
     "localhost-hosts": "REGIONS=1 PER=9 PORTALS=$((REGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (npm start -- --bridgeUrl ws://localhost:8080 --regionsStart 80 --excludedRegions 81 84 --perRegionCount ${PER} --nPortals ${PORTALS} &); popd; sleep ${SLEEP}",
     "localhost-start": "npm run localhost-bridge; npm run localhost-hosts",
-    "localhost-check": "npm start -- --bridgeUrl ws://localhost:8080 --pubHome 47 --regions 80 --fireScope reuse-previous",
-    "localhost-oneshot": "npm run localhost-start; npm run localhost-check && npm run localhost-stop-all", 
+    "localhost-check": "npm start -- --bridgeUrl ws://localhost:8080 --pubHome 47 --regions 80 --fireScope reuse-previous --topicLimit ${TOPIC_LIMIT:-0}",
+    "localhost-oneshot": "npm run localhost-start; npm run localhost-check && npm run localhost-stop-all",
     "localhost-twoshot": "npm run localhost-start; npm run localhost-check && npm run localhost-check && npm run localhost-stop-all",
 
     "localhost-hosts-us": "NREGIONS=`echo ${REGIONS_ARRAY:-80} | xargs | wc -w` PER=${PER_REGION:-9} PORTALS=$((NREGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --regionsStart `echo ${REGIONS_ARRAY:-80} | awk '{print $1}'` --excludedRegions 81 84 --perRegionCount ${PER} --nPortals ${PORTALS} &); popd; sleep ${SLEEP}",
-    "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 47 --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
+    "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 47 --topicLimit ${TOPIC_LIMIT:-0} --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
     "localhost-oneshot-us": "npm run localhost-bridge; npm run localhost-hosts-us; npm run localhost-check-us && npm run localhost-stop-all",
+
+    "dailyDemo": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl ws://localhost:3000 --regions 80 86 87 88 89 52 53 54 4c 4d >bot1.log",
+    "dailyFire": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl ws://localhost:3000 --regions 80 86 87 88 89 52 53 54 4c 4d --tags fire --fireScope us --kill false --recordKill false >bot2.log",
+    "daily": "npm run dailyDemo && npm run dailyFire",
 
     "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' npm start -- --bridgeUrl ws://testnet.axona.net --nPortals 6 &); popd",
     "mainnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' npm start -- --bridgeUrl ws://bridge.axona.net --nPortals 6 &); popd",
