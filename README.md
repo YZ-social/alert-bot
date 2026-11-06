@@ -10,6 +10,8 @@ A NodeJS script to publish to the YZ network.
 
 # Test Setup
 
+First, if you don't have `tac` (reverse `cat`) installed, either install it, or just `alias tac='tail -r'`
+
 alert-bot makes use of `@xy-social/civildefense.io`, `@axona/protocol`, and `axona-bridge`. An `npm install` from the alert-bot directory should work, but it is desirable to not have multiple copies of the various dependencies and to be able to alter them between runs of the tests. 
 
 For this purpose, I use npm workspaces. I have an yz directory that has a git clone of alert-bot and each of the above three as subdirectories:
