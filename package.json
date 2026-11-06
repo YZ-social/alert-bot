@@ -20,9 +20,13 @@
     "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 47 --topicLimit ${TOPIC_LIMIT:-0} --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
     "localhost-oneshot-us": "npm run localhost-bridge; npm run localhost-hosts-us; npm run localhost-check-us && npm run localhost-stop-all",
 
-    "dailyDemo": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl ws://localhost:3000 --regions 80 86 87 88 89 52 53 54 4c 4d >bot1.log",
-    "dailyFire": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl ws://localhost:3000 --regions 80 86 87 88 89 52 53 54 4c 4d --tags fire --fireScope us --kill false --recordKill false >bot2.log",
-    "daily": "npm run dailyDemo && npm run dailyFire",
+    "dailyDemo": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl wss://civildefense.io --pauseBeforePublishS 10 --regions 80",
+    "dailyFire": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl wss://civildefense.io --regions 80 --tags fire --fireScope us --kill false --recordKill false",
+    "daily": "(npm run dailyDemo && npm run dailyFire) >bot.log",
+
+    "kdailyDemo": "DHT=1 npm start -- --throttleMS 75 --bridgeUrl wss://testnet.axona.net --regions 80 >bot1.log",
+    "kdailyFire": "DHT=1 npm start -- --throttleMS 75 --bridgeUrl wss://testnet.axona.net --regions 80 --tags fire --fireScope us --kill false --recordKill false >bot2.log",
+    "kdaily": "npm run kdailyDemo && npm run kdailyFire",
 
     "testnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' npm start -- --bridgeUrl ws://testnet.axona.net --nPortals 6 &); popd",
     "mainnet-0x80": "pushd node_modules/@yz-social/civildefense.io; (LAT_LNG='37,-122' npm start -- --bridgeUrl ws://bridge.axona.net --nPortals 6 &); popd",
