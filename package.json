@@ -20,7 +20,7 @@
     "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 47 --topicLimit ${TOPIC_LIMIT:-0} --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
     "localhost-oneshot-us": "npm run localhost-bridge; npm run localhost-hosts-us; npm run localhost-check-us && npm run localhost-stop-all",
 
-    "dailyDemo": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl wss://civildefense.io --pauseBeforePublishS 5 --regions 4c 4d 52 53 54 80 86 87 88 89",
+    "dailyDemo": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl wss://civildefense.io --pauseBeforeDeleteS 10 --pauseBeforePublishS 10 --pauseBeforeSubscribeS 10 --regions 4c 4d 52 53 54 80 86 87 88 89",
     "dailyFire": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl wss://civildefense.io --regions 4c 4d 52 53 54 80 86 87 88 89 --tags fire --fireScope us --kill false --recordKill false",
     "daily": "(npm run dailyDemo && npm run dailyFire) >bot.log",
 
