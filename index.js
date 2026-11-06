@@ -392,7 +392,7 @@ if (canonicalTags.includes('fire')) {
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
       'fire.csv');
-    execSync('tail -r fire.csv > fire.reversed', console.error);
+    execSync('tac fire.csv >fire.reversed', console.error); // If you don't have tac installed, you can do this in the shell: alias tac='tail -r'
   }
   // If we're limiting to the first n publications in a topic, we need to reverse the data so that we're using the LAST n,
   // to get the same effect as a rollover that keeps the last n.
