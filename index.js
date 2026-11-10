@@ -289,7 +289,7 @@ async function publish({eventName, region, owner, source, ...options}) { // Publ
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
 let totalAlerts = 0;
-const publishInParallel = dht <= 0;
+const publishInParallel = true; //dht <= 0;
 async function publishAlert({lat, lng, // location on the globe
 			     label = '',
 			     eventTime = ago(3), // Javscript timestamp
@@ -366,7 +366,7 @@ for (const {lat, lng, eventTime, tag, replies, source = 'alert-bot', label = ""}
 for (const code of await readdir(streamingRootPath)) {
   if (regions && !regions.includes(code)) continue;
   const codeDir = `${streamingRootPath}/${code}`;
-  for (const styleFileName of await readdir(codeDir)) {
+  for (const styleFileName of await readdir(codeDir).catch(error => console.log(error.message, codeDir) || [])) {
     const style = styleFileName.slice(0, -'.json'.length);
     const canonical = canonicalTag(style)
     if (!canonicalTags.includes(canonical)) continue; // optimization
@@ -392,7 +392,7 @@ if (canonicalTags.includes('fire')) {
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Global_24h.csv',
       'fire.csv');
-    execSync('tac fire.csv >fire.reversed', console.error); // If you don't have tac installed, you can do this in the shell: alias tac='tail -r'
+    //fixme execSync('tac fire.csv >fire.reversed', console.error); // If you don't have tac installed, you can do this in the shell: alias tac='tail -r'
   }
   // If we're limiting to the first n publications in a topic, we need to reverse the data so that we're using the LAST n,
   // to get the same effect as a rollover that keeps the last n.
@@ -466,7 +466,7 @@ if (!dryRun && subTimeoutS) {
 	if (topicData.isChunk) topicData[key].nReceivedPub++;
 	else if (deleted) topicData[key].nReceivedKill++;
 	else if (topicData.published.has(tag)) {
-	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', topic.region.toString(16), topic.name, tag.slice(0, 30));
+	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', region.toString(16), name, tag.slice(0, 30), topic ? '' : 'no topic received by handler');
 	  else topicData[key].nReceivedPub++;
 	  topicData[key].received.add(tag);
 	}
@@ -516,8 +516,8 @@ if (!dryRun && subTimeoutS) {
     networkNode = null;
   }
   await check('run1');
-  subTimeoutS *= 2;
-  pauseBeforeSubscribeS *= 2;
+  // subTimeoutS *= 2;
+  // pauseBeforeSubscribeS *= 2;
   await check('run2');
   blankLine();
   let nPubFails = 0, nKillFails = 0, nDeviations = 0;
