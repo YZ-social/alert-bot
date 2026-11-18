@@ -107,12 +107,12 @@ const argv = yargs(hideBin(process.argv))
 
       .option('throttleMS', {
 	type: 'number',
-	default: 50,
+	default: 1,
 	description: "Number of milliseconds to pause between publish actions."
       })
       .option('subStaggerMs', {
 	type: 'number',
-	default: 0,
+	default: 1,
 	description: "Milliseconds to wait between each topic subscription. 0 (default) subscribes to all topics at once (a burst); a positive value spreads them out, closer to how real subscribers arrive and a fairer test of the system under load."
       })
       .option('disconnectAfterPublish', {
@@ -122,7 +122,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('subTimeoutS', {
 	type: 'number',
-	default: 30,
+	default: 60,
 	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
       })
       .option('pauseBeforeDeleteS', {
@@ -289,7 +289,7 @@ async function publish({eventName, region, owner, source, ...options}) { // Publ
 
 // Post to CivilDefense.io (local network or shared, depending on the externaBaseURL).
 let totalAlerts = 0;
-const publishInParallel = true; //dht <= 0;
+const publishInParallel = !throttleMS; //dht <= 0;
 async function publishAlert({lat, lng, // location on the globe
 			     label = '',
 			     eventTime = ago(3), // Javscript timestamp
@@ -450,6 +450,7 @@ if (disconnectAfterPublish) {
 }
 
 if (!dryRun && subTimeoutS) {
+  let totalDuplicates = 0;
   async function check(key) {
     blankLine();
     await pause`Waiting ${pauseBeforeRestartS} seconds before ${networkNode ? 'confirming' : 'creating new node to confirm'} delivery for ${key}.`;
@@ -466,7 +467,10 @@ if (!dryRun && subTimeoutS) {
 	if (topicData.isChunk) topicData[key].nReceivedPub++;
 	else if (deleted) topicData[key].nReceivedKill++;
 	else if (topicData.published.has(tag)) {
-	  if (topicData[key].received.has(tag)) log('*** RECEIVED DUPLICATE ***', region.toString(16), name, tag.slice(0, 30), topic ? '' : 'no topic received by handler');
+	  if (topicData[key].received.has(tag)) {
+	    totalDuplicates++;
+	    //log('*** RECEIVED DUPLICATE ***', region.toString(16), name, tag.slice(0, 30), topic ? '' : 'no topic received by handler');
+	  }
 	  else topicData[key].nReceivedPub++;
 	  topicData[key].received.add(tag);
 	}
@@ -536,6 +540,7 @@ if (!dryRun && subTimeoutS) {
   }
   blankLine();
   log(`There were ${nPubFails} pubs and ${nKillFails} kills with mismatched events (of which ${nDeviations} failures are different between run1 and run2), from the ${totalPublications} total publications (${totalAlerts} alerts in ${Object.keys(topics).length} topics), and ${totalKilled} previous kills.`);
+  log(`${totalDuplicates ? 'DUPLICATES: ': ''}A total of ${totalDuplicates} redundant subscription callbacks were fired.`);
   if (nPubFails || nKillFails) process.exit(1);
 }
 log('Done.');
