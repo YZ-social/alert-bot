@@ -17,7 +17,7 @@
     "localhost-twoshot": "npm run localhost-start; npm run localhost-check && npm run localhost-check && npm run localhost-stop-all",
 
     "localhost-hosts-us": "NREGIONS=`echo ${REGIONS_ARRAY:-80} | xargs | wc -w` PER=${PER_REGION:-3} PORTALS=$((NREGIONS * PER)) SLEEP=$(((1 + PORTALS) * 3)); pushd `node pkgdir.js @yz-social/civildefense.io`; (echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --perRegionCount ${PER} --regions &); popd; sleep ${SLEEP}",
-    "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 00 --throttleMS ${THROTTLE:-0} --subTimeoutS ${SUB_TIMEOUT:-60} --subStaggerMs ${SUB_STAGGER:-0} --topicLimit ${TOPIC_LIMIT:-0} --pauseBeforeSubscribeS ${BEFORE_SUBSCRIBE:-0} --lookupFailedTopics true --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
+    "localhost-check-us": "echo ${REGIONS_ARRAY:-80} | xargs npm start -- --bridgeUrl ${BRIDGE_URL:-ws://localhost:8080} --pubHome 00 --throttleMS ${THROTTLE:-0} --subTimeoutS ${SUB_TIMEOUT:-90} --subStaggerMs ${SUB_STAGGER:-0} --topicLimit ${TOPIC_LIMIT:-0} --pauseBeforeSubscribeS ${BEFORE_SUBSCRIBE:-0} --lookupFailedTopics true --fireScope ${FIRE_SCOPE:-reuse-previous} --regions",
     "localhost-oneshot-us": "npm run localhost-bridge; npm run localhost-hosts-us; npm run localhost-check-us; npm run localhost-stop-all",
     "localhost-twoshot-us": "npm run localhost-bridge; npm run localhost-hosts-us; npm run localhost-check-us && npm run localhost-check-us; npm run localhost-stop-all",
 
@@ -25,7 +25,7 @@
     "dailyFire": "DHT=0 npm start -- --throttleMS 75 --bridgeUrl wss://civildefense.io  --subTimeoutS 60 --regions 4c 4d 52 53 54 80 86 87 88 89 --tags fire --fireScope us --kill false --recordKill false",
     "daily": "(npm run dailyDemo && npm run dailyFire) >bot.log",
 
-    "kfleet": "npm run localhost-bridge; BRIDGE_URL=ws://localhost:8080 REGIONS_ARRAY='80 86 87 88 89' npm run localhost-hosts-us",
+    "kfleet": "npm run localhost-bridge; BRIDGE_URL=ws://localhost:8080 REGIONS_ARRAY='52 80 86 87 88 89' npm run localhost-hosts-us",
     "kdailyDemo": "npm start -- --pubHome 00 --bridgeUrl ws://localhost:8080 --regions 80 86 87 88 89",
     "kdailyFire": "npm start -- --pubHome 00 --bridgeUrl ws://localhost:8080 --regions 80 86 87 88 89 --tags fire --fireScope us --kill false --recordKill false",
     "kdaily": "npm run kdailyDemo && npm run kdailyFire",

@@ -122,7 +122,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('subTimeoutS', {
 	type: 'number',
-	default: 60,
+	default: 90,
 	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
       })
       .option('pauseBeforeDeleteS', {
@@ -479,7 +479,7 @@ if (!dryRun && subTimeoutS) {
       };
       receivedAll.push(promise);
       return topicData.isChunk ?
-	networkNode.assembleChunkedDataURL({name, region, owner}).then(handler) :
+	networkNode.assembleChunkedDataURL({name, region, owner}, {timeoutMs: subTimeoutS * 1e3}).then(handler) :
 	networkNode.subscribe({eventName: name, region, owner, handler});
     };
     if (subStaggerMs) {                       // spread subscribes out — a fairer, more realistic test
@@ -517,6 +517,7 @@ if (!dryRun && subTimeoutS) {
       }
     }
     await networkNode.disconnect(disconnectLogger);
+    //await networkNode.fastDisconnect(disconnectLogger);
     networkNode = null;
   }
   await check('run1');
