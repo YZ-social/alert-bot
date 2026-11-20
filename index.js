@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import process from 'node:process';
 import { execSync } from 'node:child_process';
-import { readdir, open, rm, appendFile } from 'node:fs/promises';
+import { copyFile, readdir, open, rm, appendFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { EOL } from 'node:os';
 import yargs from 'yargs';
@@ -34,7 +34,7 @@ const argv = yargs(hideBin(process.argv))
       .option('fireScope', {
 	type: 'string',
 	default: 'none',
-	choices: ['none', 'us', 'world', 'reuse-previous'],
+	choices: ['none', 'us', 'world', 'reuse-previous', 'test'],
 	description: "What map should be used for fire data. If not 'none', adds fire to tags."
       })
       .option('kill', {
@@ -107,12 +107,12 @@ const argv = yargs(hideBin(process.argv))
 
       .option('throttleMS', {
 	type: 'number',
-	default: 1,
+	default: 10,
 	description: "Number of milliseconds to pause between publish actions."
       })
       .option('subStaggerMs', {
 	type: 'number',
-	default: 1,
+	default: 10,
 	description: "Milliseconds to wait between each topic subscription. 0 (default) subscribes to all topics at once (a burst); a positive value spreads them out, closer to how real subscribers arrive and a fairer test of the system under load."
       })
       .option('disconnectAfterPublish', {
@@ -122,7 +122,7 @@ const argv = yargs(hideBin(process.argv))
       })
       .option('subTimeoutS', {
 	type: 'number',
-	default: 90,
+	default: 240,
 	description: "If not dryRun or zero, subscribe to each topic for up to this number of seconds, to confirm that everything published to the topic was received. There will then be a second set of subscriptions made that will run for up to twice this number of seconds."
       })
       .option('pauseBeforeDeleteS', {
@@ -386,7 +386,9 @@ for (const code of await readdir(streamingRootPath)) {
 
 // NASA FIRMS Fire Data
 if (canonicalTags.includes('fire')) {
-  if ((fireScope !== 'reuse-previous') || !existsSync('fire.csv')) {
+  if (fireScope === 'test') {
+    await copyFile('fireTest.csv', 'fire.csv');
+  } else if ((fireScope !== 'reuse-previous') || !existsSync('fire.csv')) {
     await saveUrlToFile(
       fireScope !== 'world' ?
 	'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv' :
@@ -397,10 +399,10 @@ if (canonicalTags.includes('fire')) {
   // If we're limiting to the first n publications in a topic, we need to reverse the data so that we're using the LAST n,
   // to get the same effect as a rollover that keeps the last n.
   const response = await open(topicLimit ? 'fire.reversed' : 'fire.csv').catch(console.error);
-   if (response) {
+  if (response) {
     const cutoff = Date.now() - 24 * 60 * 60e3;
     let skipped = 0, counted = 0;
-     for await (const line of response.readLines()) {
+    for await (const line of response.readLines()) {
       if (line.startsWith('latitude')) continue;
       const [latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight] = line.split(',');
       if (confidence === 'low') continue;
@@ -409,7 +411,7 @@ if (canonicalTags.includes('fire')) {
 	const region = P2PWebNetwork.regionCode(latitude, longitude).toString(16);
 	if (!regions.includes(region)) continue;
       }
-      const eventTime = new Date(`${acq_date}T${acq_time.slice(0, 2)}:${acq_time.slice(2)}Z`).getTime();
+      const eventTime = (fireScope === 'test') ? Date.now() : new Date(`${acq_date}T${acq_time.slice(0, 2)}:${acq_time.slice(2)}Z`).getTime();
       if (eventTime < cutoff) {
 	console.log('skipping expired event', new Date(eventTime));
 	skipped++;
